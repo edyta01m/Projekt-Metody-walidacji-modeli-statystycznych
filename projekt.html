@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.57">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Edyta Margol">
+
+<title>Modelowanie decyzji klientów bankowych na podstawie danych kampanii marketingowej – analiza wybranych algorytmów klasyfikacyjnych</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="projekt_files/libs/clipboard/clipboard.min.js"></script>
+<script src="projekt_files/libs/quarto-html/quarto.js"></script>
+<script src="projekt_files/libs/quarto-html/popper.min.js"></script>
+<script src="projekt_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="projekt_files/libs/quarto-html/anchor.min.js"></script>
+<link href="projekt_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="projekt_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="projekt_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="projekt_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="projekt_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<link href="projekt_files/libs/htmltools-fill-0.5.8.1/fill.css" rel="stylesheet">
+
+<script src="projekt_files/libs/htmlwidgets-1.6.4/htmlwidgets.js"></script>
+
+<link href="projekt_files/libs/datatables-css-0.0.0/datatables-crosstalk.css" rel="stylesheet">
+
+<script src="projekt_files/libs/datatables-binding-0.33/datatables.js"></script>
+
+<script src="projekt_files/libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+
+<link href="projekt_files/libs/dt-core-1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
+
+<link href="projekt_files/libs/dt-core-1.13.6/css/jquery.dataTables.extra.css" rel="stylesheet">
+
+<script src="projekt_files/libs/dt-core-1.13.6/js/jquery.dataTables.min.js"></script>
+
+<link href="projekt_files/libs/crosstalk-1.2.1/css/crosstalk.min.css" rel="stylesheet">
+
+<script src="projekt_files/libs/crosstalk-1.2.1/js/crosstalk.min.js"></script>
+
+<script src="projekt_files/libs/kePrint-0.0.1/kePrint.js"></script>
+
+<link href="projekt_files/libs/lightable-0.0.1/lightable.css" rel="stylesheet">
+
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Spis treści</h2>
+   
+  <ul>
+  <li><a href="#wstęp" id="toc-wstęp" class="nav-link active" data-scroll-target="#wstęp">Wstęp</a>
+  <ul class="collapse">
+  <li><a href="#eksploracyjna-analiza-danych-eda-i-wizualizacja-danych" id="toc-eksploracyjna-analiza-danych-eda-i-wizualizacja-danych" class="nav-link" data-scroll-target="#eksploracyjna-analiza-danych-eda-i-wizualizacja-danych">Eksploracyjna analiza danych (EDA) i wizualizacja danych</a></li>
+  <li><a href="#czyszczenie-danych" id="toc-czyszczenie-danych" class="nav-link" data-scroll-target="#czyszczenie-danych">Czyszczenie danych</a></li>
+  <li><a href="#budowa-modeli" id="toc-budowa-modeli" class="nav-link" data-scroll-target="#budowa-modeli">Budowa modeli</a>
+  <ul class="collapse">
+  <li><a href="#drzewo-decyzyjne" id="toc-drzewo-decyzyjne" class="nav-link" data-scroll-target="#drzewo-decyzyjne">Drzewo decyzyjne</a></li>
+  <li><a href="#random-forest" id="toc-random-forest" class="nav-link" data-scroll-target="#random-forest">Random Forest</a></li>
+  <li><a href="#xgboost" id="toc-xgboost" class="nav-link" data-scroll-target="#xgboost">XGBoost</a></li>
+  <li><a href="#regresja-logistyczna" id="toc-regresja-logistyczna" class="nav-link" data-scroll-target="#regresja-logistyczna">Regresja logistyczna</a></li>
+  <li><a href="#support-vector-machines-svm" id="toc-support-vector-machines-svm" class="nav-link" data-scroll-target="#support-vector-machines-svm">Support Vector Machines (SVM)</a></li>
+  <li><a href="#mlp-multi-layer-perceptron" id="toc-mlp-multi-layer-perceptron" class="nav-link" data-scroll-target="#mlp-multi-layer-perceptron">MLP – Multi-Layer Perceptron</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#podsumowanie" id="toc-podsumowanie" class="nav-link" data-scroll-target="#podsumowanie">Podsumowanie</a></li>
+  <li><a href="#wnioski" id="toc-wnioski" class="nav-link" data-scroll-target="#wnioski">Wnioski</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Modelowanie decyzji klientów bankowych na podstawie danych kampanii marketingowej – analiza wybranych algorytmów klasyfikacyjnych</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Edyta Margol </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="wstęp" class="level1">
+<h1>Wstęp</h1>
+<p>Celem niniejszego projektu było zbudowanie i porównanie wybranych modeli klasyfikacyjnych w zadaniu przewidywania decyzji klientów bankowych o wykupieniu lokaty terminowej na podstawie danych pochodzących z rzeczywistej kampanii marketingowej portugalskiego banku. Analizie poddano zbiór danych bank-additional-full.csv, udostępniony w repozytorium UCI Machine Learning Repository (<a href="#0">https://archive.ics.uci.edu/dataset/222/bank+marketing</a>), który zawiera informacje o klientach, parametrach kontaktu oraz zmiennych makroekonomicznych z okresu prowadzonej kampanii. Dane te obejmują łącznie ponad 41 tysięcy obserwacji i 21 zmiennych opisujących zarówno cechy demograficzne klientów, jak i otoczenie gospodarcze.</p>
+<p>W ramach projektu przeprowadzono kompleksową eksploracyjną analizę danych (EDA), przygotowanie i wstępne przetwarzanie danych wejściowych, a następnie zastosowano oraz porównano skuteczność wybranych algorytmów klasyfikacyjnych, takich jak: drzewo decyzyjne, Random Forest, XGBoost, regresja logistyczna, maszyna wektorów nośnych (SVM) oraz wielowarstwowy perceptron (MLP). Ocenę skuteczności modeli przeprowadzono przy wykorzystaniu podstawowych miar jakości klasyfikacji, takich jak accuracy, precision, recall, f-measure, ROC AUC oraz macierz konfuzji.</p>
+<p>Zmienne w zbiorze opisują:</p>
+<ul>
+<li><p>dane klientów banku:</p>
+<p>1 - <strong>age</strong>: wiek (zmienna numeryczna)</p>
+<p>2 - <strong>job</strong> : zawód klienta (zmienna kategoryczna przyjmująca poziomy: “admin.”, “blue-collar”, “entrepreneur”, “housemaid”, “management”, “retired”, “self-employed”, “services”, “student”, “technician”, “unemployed”, “unknown”)</p>
+<p>3 - <strong>marital</strong> : stan cywilny (zmienna kategoryczna przyjmująca poziomy: “divorced”, “married”, “single”, “unknown” ; uwaga: “divorced” oznacza rozwiedziony lub owdowiały)</p>
+<p>4 - <strong>education</strong>: wykształcenie (zmienna kategoryczna przyjmująca poziomy: “basic.4y”, “basic.6y”, “basic.9y”, “high.school”, “illiterate”, “professional.course”, “university.degree”, “unknown”)</p>
+<p>5 - <strong>default</strong>: czy klient ma zaległości w spłatach kredytu? (zmienna kategoryczna przyjmująca poziomy: “no”, “yes”, “unknown”)</p>
+<p>6 - <strong>housing</strong>: czy klient posiada kredyt hipoteczny? (zmienna kategoryczna przyjmująca poziomy: “no”, “yes”, “unknown”)</p>
+<p>7 - <strong>loan</strong>: czy klient posiada inny kredyt konsumencki? (zmienna kategoryczna przyjmująca poziomy: “no”, “yes”, “unknown”)</p></li>
+<li><p>dane związane z ostatnim kontaktem w ramach bieżącej kampanii:</p>
+<p>8 - <strong>contact</strong>: rodzaj kontaktu (zmienna kategoryczna przyjmująca poziomy: “cellular”, “telephone”)</p>
+<p>9 - <strong>month</strong>: miesiąc kontaktu (zmienna kategoryczna przyjmująca poziomy: “jan”, “feb”, “mar”, …, “nov”, “dec”)</p>
+<p>10 - <strong>day_of_week</strong>: dzień kontaktu (zmienna kategoryczna przyjmująca poziomy: “mon”, “tue”, “wed”, “thu”, “fri”)</p>
+<p>11 - <strong>duration</strong>: czas trwania kontaktu w sekundach (zmienna numeryczna).</p></li>
+<li><p>inne atrybuty:</p>
+<p>12 - <strong>campaign</strong>: liczba kontaktów nawiązanych podczas danej kampanii i z danym klientem (zmienna numeryczna, obejmuje ostatni kontakt)</p>
+<p>13 - <strong>pdays</strong>: liczba dni, które upłynęły od ostatniego kontaktu z klientem w ramach poprzedniej kampanii (zmienna numeryczna; 999 oznacza, że nie kontaktowano się wcześniej z danym klientem)</p>
+<p>14 - <strong>previous</strong>: liczba kontaktów nawiązanych przed daną kampanią z danym klientem (zmienna numeryczna)</p>
+<p>15 - <strong>poutcome</strong>: rezultat poprzedniej kampanii marketingowej (zmienna kategoryczna przyjmująca poziomy: “failure”, “nonexistent”, “success”)</p></li>
+<li><p>atrybuty kontekstu społecznego i gospodarczego</p>
+<p>16 - <strong>emp.var.rate</strong>: wskaźnik zmienności zatrudnienia (employment variation rate) – wskaźnik kwartalny (zmienna numeryczna)</p>
+<p>17 - <strong>cons.price.idx</strong>: wskaźnik cen konsumpcyjnych (consumer price index)– wskaźnik miesięczny (zmienna numeryczna)</p>
+<p>18 - <strong>cons.conf.idx</strong>: wskaźnik zaufania konsumentów (consumer confidence index) – wskaźnik miesięczny (zmienna numeryczna)</p>
+<p>19 - <strong>euribor3m</strong>: 3-miesięczna stopa Euribor – wskaźnik dzienny (zmienna numeryczna)</p>
+<p>20 - <strong>nr.employed</strong>: liczba zatrudnionych osób (wskaźnik rynku pracy)– wskaźnik kwartalny (zmienna numeryczna)</p></li>
+<li><p>Zmienna wyjściowa:</p>
+<p>21 - <strong>y</strong>: czy klient wykupił lokatę terminową? (zmienna binarna przyjmująca poziomy: “yes”,“no”)</p></li>
+</ul>
+<p>Poniżej przedstawiono fragment danych.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div class="datatables html-widget html-fill-item" id="htmlwidget-8ccba399c016fdba09cc" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-8ccba399c016fdba09cc">{"x":{"filter":"none","vertical":false,"data":[["1","2","3","4","5","6"],[56,57,37,40,56,45],["housemaid","services","services","admin.","services","services"],["married","married","married","married","married","married"],["basic.4y","high.school","high.school","basic.6y","high.school","basic.9y"],["no","unknown","no","no","no","unknown"],["no","no","yes","no","no","no"],["no","no","no","no","yes","no"],["telephone","telephone","telephone","telephone","telephone","telephone"],["may","may","may","may","may","may"],["mon","mon","mon","mon","mon","mon"],[261,149,226,151,307,198],[1,1,1,1,1,1],[999,999,999,999,999,999],[0,0,0,0,0,0],["nonexistent","nonexistent","nonexistent","nonexistent","nonexistent","nonexistent"],[1.1,1.1,1.1,1.1,1.1,1.1],[93.994,93.994,93.994,93.994,93.994,93.994],[-36.4,-36.4,-36.4,-36.4,-36.4,-36.4],[4.857,4.857,4.857,4.857,4.857,4.857],[5191,5191,5191,5191,5191,5191],["no","no","no","no","no","no"]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>age<\/th>\n      <th>job<\/th>\n      <th>marital<\/th>\n      <th>education<\/th>\n      <th>default<\/th>\n      <th>housing<\/th>\n      <th>loan<\/th>\n      <th>contact<\/th>\n      <th>month<\/th>\n      <th>day_of_week<\/th>\n      <th>duration<\/th>\n      <th>campaign<\/th>\n      <th>pdays<\/th>\n      <th>previous<\/th>\n      <th>poutcome<\/th>\n      <th>emp.var.rate<\/th>\n      <th>cons.price.idx<\/th>\n      <th>cons.conf.idx<\/th>\n      <th>euribor3m<\/th>\n      <th>nr.employed<\/th>\n      <th>y<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,11,12,13,14,16,17,18,19,20]},{"orderable":false,"targets":0},{"name":" ","targets":0},{"name":"age","targets":1},{"name":"job","targets":2},{"name":"marital","targets":3},{"name":"education","targets":4},{"name":"default","targets":5},{"name":"housing","targets":6},{"name":"loan","targets":7},{"name":"contact","targets":8},{"name":"month","targets":9},{"name":"day_of_week","targets":10},{"name":"duration","targets":11},{"name":"campaign","targets":12},{"name":"pdays","targets":13},{"name":"previous","targets":14},{"name":"poutcome","targets":15},{"name":"emp.var.rate","targets":16},{"name":"cons.price.idx","targets":17},{"name":"cons.conf.idx","targets":18},{"name":"euribor3m","targets":19},{"name":"nr.employed","targets":20},{"name":"y","targets":21}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+</div>
+</div>
+<section id="eksploracyjna-analiza-danych-eda-i-wizualizacja-danych" class="level2">
+<h2 class="anchored" data-anchor-id="eksploracyjna-analiza-danych-eda-i-wizualizacja-danych">Eksploracyjna analiza danych (EDA) i wizualizacja danych</h2>
+<ul>
+<li><strong>Struktura zmiennych:</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>'data.frame':   41188 obs. of  21 variables:
+ $ age           : int  56 57 37 40 56 45 59 41 24 25 ...
+ $ job           : chr  "housemaid" "services" "services" "admin." ...
+ $ marital       : chr  "married" "married" "married" "married" ...
+ $ education     : chr  "basic.4y" "high.school" "high.school" "basic.6y" ...
+ $ default       : chr  "no" "unknown" "no" "no" ...
+ $ housing       : chr  "no" "no" "yes" "no" ...
+ $ loan          : chr  "no" "no" "no" "no" ...
+ $ contact       : chr  "telephone" "telephone" "telephone" "telephone" ...
+ $ month         : chr  "may" "may" "may" "may" ...
+ $ day_of_week   : chr  "mon" "mon" "mon" "mon" ...
+ $ duration      : int  261 149 226 151 307 198 139 217 380 50 ...
+ $ campaign      : int  1 1 1 1 1 1 1 1 1 1 ...
+ $ pdays         : int  999 999 999 999 999 999 999 999 999 999 ...
+ $ previous      : int  0 0 0 0 0 0 0 0 0 0 ...
+ $ poutcome      : chr  "nonexistent" "nonexistent" "nonexistent" "nonexistent" ...
+ $ emp.var.rate  : num  1.1 1.1 1.1 1.1 1.1 1.1 1.1 1.1 1.1 1.1 ...
+ $ cons.price.idx: num  94 94 94 94 94 ...
+ $ cons.conf.idx : num  -36.4 -36.4 -36.4 -36.4 -36.4 -36.4 -36.4 -36.4 -36.4 -36.4 ...
+ $ euribor3m     : num  4.86 4.86 4.86 4.86 4.86 ...
+ $ nr.employed   : num  5191 5191 5191 5191 5191 ...
+ $ y             : chr  "no" "no" "no" "no" ...</code></pre>
+</div>
+</div>
+<p>Zbiór zawiera 41 176 obserwacji oraz 21 zmiennych. Dane zawierają zarówno zmienne numeryczne, jak i kategoryczne. Wszystkie zmienne kategoryczne są reprezentowane jako tekst (typ character), a zmienne numeryczne jako integer lub numeric.</p>
+<ul>
+<li><strong>Analiza statystyk opisowych:</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>      age            job              marital           education        
+ Min.   :17.00   Length:41188       Length:41188       Length:41188      
+ 1st Qu.:32.00   Class :character   Class :character   Class :character  
+ Median :38.00   Mode  :character   Mode  :character   Mode  :character  
+ Mean   :40.02                                                           
+ 3rd Qu.:47.00                                                           
+ Max.   :98.00                                                           
+   default            housing              loan             contact         
+ Length:41188       Length:41188       Length:41188       Length:41188      
+ Class :character   Class :character   Class :character   Class :character  
+ Mode  :character   Mode  :character   Mode  :character   Mode  :character  
+                                                                            
+                                                                            
+                                                                            
+    month           day_of_week           duration         campaign     
+ Length:41188       Length:41188       Min.   :   0.0   Min.   : 1.000  
+ Class :character   Class :character   1st Qu.: 102.0   1st Qu.: 1.000  
+ Mode  :character   Mode  :character   Median : 180.0   Median : 2.000  
+                                       Mean   : 258.3   Mean   : 2.568  
+                                       3rd Qu.: 319.0   3rd Qu.: 3.000  
+                                       Max.   :4918.0   Max.   :56.000  
+     pdays          previous       poutcome          emp.var.rate     
+ Min.   :  0.0   Min.   :0.000   Length:41188       Min.   :-3.40000  
+ 1st Qu.:999.0   1st Qu.:0.000   Class :character   1st Qu.:-1.80000  
+ Median :999.0   Median :0.000   Mode  :character   Median : 1.10000  
+ Mean   :962.5   Mean   :0.173                      Mean   : 0.08189  
+ 3rd Qu.:999.0   3rd Qu.:0.000                      3rd Qu.: 1.40000  
+ Max.   :999.0   Max.   :7.000                      Max.   : 1.40000  
+ cons.price.idx  cons.conf.idx     euribor3m      nr.employed  
+ Min.   :92.20   Min.   :-50.8   Min.   :0.634   Min.   :4964  
+ 1st Qu.:93.08   1st Qu.:-42.7   1st Qu.:1.344   1st Qu.:5099  
+ Median :93.75   Median :-41.8   Median :4.857   Median :5191  
+ Mean   :93.58   Mean   :-40.5   Mean   :3.621   Mean   :5167  
+ 3rd Qu.:93.99   3rd Qu.:-36.4   3rd Qu.:4.961   3rd Qu.:5228  
+ Max.   :94.77   Max.   :-26.9   Max.   :5.045   Max.   :5228  
+      y            
+ Length:41188      
+ Class :character  
+ Mode  :character  
+                   
+                   
+                   </code></pre>
+</div>
+</div>
+<p>Na podstawie danych opisowych można zauważyć, że wiek badanych osób waha się od 17 do 98 lat, przy czym średnia wieku wynosi około 40 lat, a mediana to 38 lat, co sugeruje, że wwiększość badanych to osby młodsze i w średnim wieku. Górny kwartyl wskazuje, że 75% badanych było w wieku poniżej 47 lat, natomiast maksymalna wartość wskazuje na niewielką grupę osób starszych.</p>
+<p>Czas trwania rozmowy z klientem jest bardzo zróżnicowany i mieści się w przedziale od 0 do ponad 4900 sekund. Średni czas to około 258 sekund, a mediana 180 sekund. To sugeruje, że większość rozmów jest stosunkowo krótka, jednak występują pojedyncze, znacznie dłuższe kontakty.</p>
+<p>Liczba kontaktów z klientem w ramach kampanii waha się od 1 do aż 56, z medianą wynoszącą 2, co oznacza, że z większością osób kontaktowano się maksymalnie kilka razy.</p>
+<p>Jeśli chodzi o zmienną „pdays”, która wskazuje liczbę dni od ostatniego kontaktu w poprzedniej kampanii, mediana wynosi 999, co w tym kontekście oznacza brak wcześniejszego kontaktu dla większości osób.</p>
+<p>Z kolei liczba poprzednich kontaktów jest bardzo niska – średnia jest bliska zeru, co sugeruje, że tylko z niewielką częścią klientów kontaktowano się wcześniej.</p>
+<p>Zmienne makroekonomiczne takie jak stopa zmienności zatrudnienia, indeks cen konsumpcyjnych oraz indeks zaufania konsumentów pokazują, że dane obejmują okresy zarówno gorsze, jak i lepsze pod względem gospodarczym.</p>
+<p>Stopa procentowa EURIBOR na 3 miesiące waha się od około 0.6 do 5, a mediana wynosi około 4.86, co wskazuje na okresy wysokich stóp procentowych.</p>
+<p>Liczba zatrudnionych osób jest stosunkowo stabilna, oscylując wokół wartości 5200, co może odzwierciedlać stabilność rynku pracy w danym obszarze lub sektorze.</p>
+<ul>
+<li><strong>Sprawdzenie braków danych:</strong></li>
+</ul>
+<p>Zbiór nie ma braków danych. Jednak we wszystkich zmiennych kategorycznych poziomy “unknown” można traktować jako braki danych bądź jako jedną z etykiet klasy. Liczba wierszy, które zawierają co najmniej jeden poziom “unknown” wynosi 10700, co stanowi ok. 26% wszystkich danych. Jest to zdecydowanie za dużo, żeby można było usunąć te wiersze. Dla zachowania rzetelności danych, pozostawimy poziomy “unknown” jako etykiety klasy.</p>
+<ul>
+<li><strong>Sprawdzenie duplikatów danych:</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 12</code></pre>
+</div>
+</div>
+<p>W danych występuje 12 duplikatów.</p>
+<ul>
+<li><strong>Rozkłady oraz rozrzut wartości zmiennych numerycznych:</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-10-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Rozkłady zmiennych numerycznych w analizowanym zbiorze są w większości skośne i charakteryzują się obecnością wartości odstających. Wiek klientów jest skupiony głównie w przedziale 30–50 lat, natomiast na wykresie rozrzutu wartości widać przypadki osób znacznie starszych, które tworzą wartości odstające.</p>
+<p>Czas trwania rozmowy telefonicznej jest zmienną o bardzo wyraźnym skośnym rozkładzie. Najwięcej rozmów trwało krótko, co widać po skupieniu wartości przy dolnym końcu skali, ale istnieją rozmowy trwające kilkadziesiąt minut, które odstają od reszty danych.</p>
+<p>Liczba kontaktów z klientem podczas kampanii również wykazuje silną asymetrię. Z większością klientów kontaktowano się jeden lub dwa razy, podczas gdy pojedyncze przypadki obejmują kilkanaście lub kilkadziesiąt prób kontaktu, co widać na wykresie jako odległe punkty odstające.</p>
+<p>Zmienne związane z wcześniejszymi kontaktami, takie jak previous i pdays, pokazują, że większość wartości skupia się przy zerze lub, w przypadku zmiennej pdays, dominującej kategorii 999, co sugeruje brak wcześniejszego kontaktu dla większości klientów. Rozrzut w tych zmiennych jest niewielki poza nielicznymi wyjątkami.</p>
+<p>Zmienne makroekonomiczne, takie jak wskaźnik zmienności zatrudnienia, indeks cen konsumpcyjnych, indeks zaufania konsumentów, stopa Euribor oraz liczba zatrudnionych, mają rozkłady znacznie bardziej zwarte i symetryczne. W ich przypadku nie zaobserwowano widocznych wartości odstających. Wykresy tych zmiennych pokazują stosunkowo wąskie zakresy, a dane koncentrują się wokół średnich wartości.</p>
+<ul>
+<li><strong>Rozkład zmiennych kategorycznych:</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-11-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Najczęściej występującymi zawodami w zbiorze są „admin.”, „technician” i „blue-collar”, które łącznie stanowią dużą część próby. Z kolei kategorie takie jak „student”, „housemaid” czy „self-employed” są reprezentowane w znacznie mniejszym stopniu.</p>
+<p>Jeśli chodzi o stan cywilny, dominującą grupę stanowią osoby zamężne lub żonate, a następnie osoby stanu wolnego i rozwiedzione/owdowiałe.</p>
+<p>W zmiennej education najliczniejszymi kategoriami są „high.school” oraz „university.degree”, jednak w zbiorze występuje też znaczący udział wartości „unknown”.</p>
+<p>Jeśli chodzi o zmienne finansowe: default, housing i loan, które opisują sytuację kredytową klienta, w większości przypadków klienci nie posiadają zaległości w spłacie kredytów ani dodatkowych zobowiązań finansowych, jednak w każdej z tych zmiennych występują też liczne wartości „unknown”, szczególnie w przypadku default.</p>
+<p>Zmienna contact, informująca o rodzaju kontaktu (telefon stacjonarny vs komórkowy), wskazuje, że zdecydowana większość interakcji odbywała się przez telefon komórkowy.</p>
+<p>Rozkład zmiennych month i day_of_week pokazuje, że kontakty były prowadzone intensywnie w maju, lipcu i sierpniu, a najwięcej połączeń odbywało się w środku tygodnia, zwłaszcza w środę i czwartek. Wzrost pozytywnych odpowiedzi w niektórych miesiącach (np. marzec, grudzień) może sugerować sezonowość w skuteczności kampanii.</p>
+<p>Zmienne związane z wcześniejszymi kampaniami, takie jak poutcome, pokazują, że dla większości klientów wynik wcześniejszych kampanii był oznaczony jako „nonexistent”, czyli brak wcześniejszych prób kontaktu.</p>
+<p>Na koniec warto zauważyć, że zmienna y, czyli zmienna docelowa, jest mocno niezrównoważona – zdecydowana większość klientów nie zdecydowała się na lokatę, co należy uwzględnić przy dalszym modelowaniu.</p>
+<ul>
+<li><strong>Macierz korelacji dla zmiennych numerycznych:</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Do analizy korelacji między zmiennymi wykorzystano współczynnik korelacji Spearmana, co umożliwia uwzględnienie również nieliniowych relacji.</p>
+<p>Wyniki pokazały, że najsilniejsza dodatnia korelacja występuje pomiędzy zmiennymi euribor3m, nr.employed oraz emp.var.rate.</p>
+<p>Pozostałe zmienne, takie jak age, campaign, pdays, previous oraz duration, nie wykazują silnych korelacji między sobą ani z pozostałymi cechami.</p>
+<ul>
+<li><strong>Wykresy słupkowe zmiennych kategorycznych względem y</strong>:</li>
+</ul>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Po analizie wykresów słupkowych, przedstawiających rozkład zmiennych kategorycznych względem zmiennej docelowej y, można zauważyć różnice w odpowiedziach y w zależności od zawodu klienta. Największy odsetek odpowiedzi „yes” występował wśród studentów (“student”), pracowników z branży usługowej (“services”), pokojówek (“housemaid”) oraz kadry zarządzającej (“management”). Z kolei grupą zawodową, która najrzadziej decydowała się na założenie lokaty, byli emeryci.</p>
+<p>Podobne zależności widoczne są w przypadku zmiennej marital. Osoby stanu wolnego częściej podejmowały decyzję o założeniu lokaty w porównaniu do osób zamężnych.</p>
+<p>W kategorii education można zauważyć, że klienci z wykształceniem wyższym wykazywały większą skłonność do podjęcia lokaty w porównaniu do pozostałych osób.</p>
+<p>Po analizie zmiennych związanych z sytuacją kredytową: housing, loan i default, mozna stwierdzić, że klienci nieposiadający kredytu (hipotecznego bądź konsumenckiego) oraz nieposiadający zaległości w spłacie kredytów byli bardziej skłonni do założenia lokaty.</p>
+<p>Co ciekawe, również sposób kontaktu z klientem miał znaczenie. Wśród klientów, z którymi kontaktowano się przez telefon komórkowy odnotowano wyższy odsetek odpowiedzi twierdzących niż wśród tych, z którymi kontaktowano się przez telefon stacjonarny.</p>
+<p>Analiza zmiennych month i day_of_week ukazała sezonowość w odpowiedziach klientów. W niektórych miesiącach – takich jak październik, wrzesień czy kwiecień– odsetek odpowiedzi pozytywnych był wyraźnie wyższy niż w pozostałych. Podobnie, w niektóre dni tygodnia – zwłaszcza we wtorek i środę – skuteczność kontaktu była nieco wyższa niż w poniedziałki czy piątki.</p>
+<p>Na szczególną uwagę zasługuje zmienna poutcome, która wskazuje wynik poprzedniej kampanii. Klienci, którzy zdecydowali się na założenie lokaty w poprzedniej kampanii, znacznie częściej odpowiadali „yes” również w bieżącej kampanii.</p>
+<ul>
+<li><strong>Boxploty zmiennych numerycznych względem y:</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>W przypadku age rozkłady w obu grupach są do siebie zbliżone. Mediany wieku są porównywalne. Widoczny jest szeroki rozrzut wieku oraz pojedyncze wartości odstające w górnym zakresie wieku.</p>
+<p>W przypadku zmiennej duration rozkład jest zróżnicowany między grupami. Rozrzut wartości dla osób, które nie założyły lokaty jest większy, a na wykresie widocznych jest wiele wartości odstających.</p>
+<p>Dla zmiennej campaign, która opisuje liczbę kontaktów w ramach bieżącej kampanii, rozrzut wartości również jest większy dla osób, które nie założyły lokaty, a na wykresie widocznych jest wiele wartości odstających.</p>
+<p>Jeśli chodzi o zmienną pdays, w obu grupach dominuje wartość 999, co oznacza, że z większością klientów nie było wcześniejszego kontaktu. Rozkład jest więc silnie skupiony na jednej wartości i nie widać istotnych różnic między grupami.</p>
+<p>Podobny rozkład obserwujemy w przypadku zmiennej <em>previous</em> — w obu grupach dominują wartości zerowe, jednak pojawiają się również wartości odstające, które odpowiadają klientom, z którymi wcześniej nawiązano większą liczbę kontaktów.</p>
+</section>
+<section id="czyszczenie-danych" class="level2">
+<h2 class="anchored" data-anchor-id="czyszczenie-danych">Czyszczenie danych</h2>
+<p>Czyszczenie danych obejmowało:</p>
+<ul>
+<li>usunięcie duplikatów danych</li>
+</ul>
+<ul>
+<li>usunięcie zmiennej duration - modele mają za zadanie przewidywać czy klient zdecyduje sie na założenie lokaty, jeszcze przed rozmową z nim. Natomiast czas trwania rozmowy jest znany dopiero po zakończeniu rozmowy. Z tego względu, należy usunąć tą zmienną, aby wyniki były wiarygodne.</li>
+</ul>
+<ul>
+<li>zamianę poziomów zmiennych kategorycznych,</li>
+</ul>
+<ul>
+<li><p>utworzenie zbioru danych Dataset2, dla potrzeb niektórych z modeli, w którym:</p>
+<p>-usunięto zmienne silnie skorelowane (emp.var.rate i euribor3m),</p>
+<p>-przekształcono pdays na zmienną binarną - przyjmującą wartość 1, jeżeli wystąpił wcześniejszy kontakt z klientem oraz 0, jezeli kontaktu nie było,</p>
+<p>-usunięto ekstremalne obserwacje w campaign i zastąpiono je wartością 0.95 percentyla,</p></li>
+</ul>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<ul>
+<li>podział danych - dla pierwotnego zbioru;</li>
+</ul>
+<ul>
+<li>podział danych - dla Dataset2.</li>
+</ul>
+</section>
+<section id="budowa-modeli" class="level2">
+<h2 class="anchored" data-anchor-id="budowa-modeli">Budowa modeli</h2>
+<p>W projekcie przeprowadzono porównanie skuteczności sześciu modeli klasyfikacyjnych: drzewa decyzyjnego, lasu losowego (Random Forest), XGBoost, regresji logistycznej, maszyny wektorów nośnych (SVM) oraz wielowarstwowej sieci neuronowej (MLP). Modele oceniano zarówno w wersji bazowej (z domyślnymi ustawieniami), jak i po strojeniu hiperparametrów, wykorzystując pięć podstawowych metryk:</p>
+<ul>
+<li><p>accuracy - stosunek liczby poprawnie sklasyfikowanych obserwacji do ogólnej liczby wszystkich próbek,</p></li>
+<li><p>precision - stosunek poprawnie przewidzianych pozytywnych przypadków do wszystkich przypadków zaklasyfikowanych jako pozytywne,</p></li>
+<li><p>recall - stosunek poprawnie wykrytych pozytywnych przypadków do wszystkich faktycznych pozytywnych przypadków,</p></li>
+<li><p>f-measure - średnia harmoniczna precyzji i czułości,</p></li>
+<li><p>ROC AUC - zdolność modelu do rozróżniania klas bez względu na konkretny próg decyzyjny.</p></li>
+</ul>
+<p>oraz macierz konfuzji (tabela podsumowująca wyniki klasyfikacji, pokazująca liczbę poprawnych i błędnych przewidywań dla każdej klasy).</p>
+<section id="drzewo-decyzyjne" class="level3">
+<h3 class="anchored" data-anchor-id="drzewo-decyzyjne">Drzewo decyzyjne</h3>
+<p>Drzewa decyzyjne to jedna z najpopularniejszych i intuicyjnych metod uczenia maszynowego, wykorzystywanych zarówno w zadaniach klasyfikacyjnych, jak i regresyjnych. Model ma postać hierarchicznego drzewa, gdzie na każdym węźle podejmowana jest decyzja o podziale danych na podstawie wartości jednej z cech. Celem kolejnych podziałów jest maksymalne rozdzielenie obserwacji należących do różnych klas. Model jest intuicyjny i łatwy do interpretacji, ponieważ przedstawia ciąg logicznych decyzji prowadzących do przypisania obserwacji do odpowiedniej klasy. Do zalet drzewa decyzyjnego należy prostota, brak wymagań co do normalizacji danych i możliwość pracy zarówno na zmiennych liczbowych, jak i kategorycznych.</p>
+<ul>
+<li><strong>Model bazowy</strong> <strong>- z domyślnymi parametrami</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Tree (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-27-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model        accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;           &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Tree (train)    0.900     0.905  0.991  0.946   0.703</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Tree (test)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-28-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model       accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;          &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Tree (test)    0.899     0.906  0.989  0.946   0.713</code></pre>
+</div>
+</div>
+<p>Dla modelu bazowego, na zbiorze treningowym osiągnięto bardzo wysoką dokładność (accuracy) na poziomie 0.900, a na zbiorze testowym wyniosła ona 0.899, co wskazuje na niemal identyczną skuteczność predykcji w obu przypadkach. Wartość precision również była bardzo wysoka – 0.905 w treningu i 0.906 w teście. Jeszcze wyższy okazał się recall, który wyniósł 0.991 na treningu i 0.989 na teście, co oznacza, że model potrafił poprawnie wykryć niemal wszystkie przypadki klientów, którzy zdecydowali się na lokatę. Wysokie wartości precision i recall przełożyły się na wysoki wynik F1-score: 0.946 w obu zbiorach. Wskaźnik AUC wynosił odpowiednio 0.703 (train) i 0.713 (test), co świadczy o umiarkowanej zdolności modelu do rozróżniania klas.</p>
+<p>Macierz pomyłek dla modelu bazowego pokazuje W obu zbiorach większość klientów, którzy rzeczywiście zdecydowali się na lokatę, została poprawnie sklasyfikowana. Liczba fałszywie negatywnych (czyli błędów, gdzie klient faktycznie założył lokatę, a model przewidział “nie”) była bardzo niska.</p>
+<p>Macierze pomyłek dla tego modelu pokazują, że zarówno na zbiorze treningowym, jak i testowym model dobrze rozpoznaje przypadki obu klas.</p>
+<ul>
+<li><strong>Model z tuningiem</strong></li>
+</ul>
+<p>Optymalizacji poddano trzy kluczowe parametry kontrolujące złożoność drzewa:</p>
+<ul>
+<li><p>cost_complexity — współczynnik kary za złożoność drzewa, odpowiadający za przycinanie (pruning) i eliminowanie nadmiernie skomplikowanych podziałów,</p></li>
+<li><p>tree_depth — maksymalną głębokość drzewa, ograniczającą liczbę kolejnych podziałów,</p></li>
+<li><p>min_n — minimalną liczbę obserwacji w liściu, pozwalającą kontrolować wielkość końcowych podzbiorów.</p></li>
+</ul>
+<p>Do wyboru optymalnej kombinacji hiperparametrów zastosowano siatkę regularną, w której ustalono następujące zakresy wartości:</p>
+<ul>
+<li><p>cost_complexity: od <span class="math inline">\(10^{-4}\)</span> do <span class="math inline">\(10^{-1}\)</span>,</p></li>
+<li><p>tree_depth: od 1 do 10,</p></li>
+<li><p>min_n: od 2 do 20.</p></li>
+</ul>
+<p>Dla każdego z parametrów przyjęto po 3 poziomy wartości, dzięki czemu przeszukano wszystkie możliwe kombinacje w sposób systematyczny. Proces strojenia przeprowadzono przy użyciu 5-krotnej walidacji krzyżowej.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Tree tuned (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-37-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model              accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                 &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Tree tuned (train)    0.902     0.913  0.984  0.947   0.705</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Tree tuned (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-38-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model              accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                 &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Tree tuned (train)    0.899     0.913  0.979  0.945   0.715</code></pre>
+</div>
+</div>
+<p>W przypadku modelu po tuningu, wyniki również były bardzo wysokie. Dokładność na zbiorze treningowym wyniosła 0.902, a na teście 0.899. Precision było identyczne w obu zbiorach i wyniosło 0.913, a recall nieco spadło w porównaniu do modelu bazowego, ale nadal było bardzo wysokie – 0.984 na treningu i 0.979 na teście. F1-score pozostał na poziomie 0.947 (train) i 0.945 (test), co wskazuje na zachowanie dobrego balansu między czułością a precyzją. Wskaźniki AUC również lekko wzrosły w stosunku do modelu bazowego – odpowiednio 0.705 i 0.715. Wysoka stabilność metryk pomiędzy zbiorem treningowym i testowym wskazuje, że model jest dobrze dopasowany i nie występuje zjawisko przeuczenia.</p>
+<p>Również w tym przypadku, analiza macierzy pomyłek potwierdza skuteczność modelu – model dobrze radził sobie z rozpoznawaniem zarówno klasy pozytywnej, jak i negatywnej. Liczba fałszywie pozytywnych błędów uległa lekkiemu zmniejszeniu względem modelu bazowego. Zarówno na treningu, jak i teście uzyskano bardzo podobne rozkłady błędów.</p>
+</section>
+<section id="random-forest" class="level3">
+<h3 class="anchored" data-anchor-id="random-forest">Random Forest</h3>
+<p>Random Forest to algorytm zespołowy (ensemble), który buduje wiele niezależnych drzew decyzyjnych i łączy ich predykcje w celu uzyskania bardziej stabilnego i dokładnego modelu klasyfikacyjnego. Każde drzewo trenowane jest na losowo wybranym podzbiorze danych (bootstrap), a na każdym etapie podziału węzła losowana jest ograniczona liczba cech, spośród których wybierana jest optymalna. Dzięki temu poszczególne drzewa są zróżnicowane, a łączenie ich prognoz (najczęściej poprzez głosowanie większościowe) pozwala redukować wariancję i ograniczać ryzyko przeuczenia.</p>
+<p>Do zalet Random Forest należą: wysoka odporność na przeuczenie, dobra skuteczność nawet na danych o dużej liczbie cech i brak konieczności intensywnego przygotowania danych. Wady to m.in. mniejsza interpretowalność w porównaniu do pojedynczego drzewa oraz dłuższy czas trenowania przy dużych zbiorach danych.</p>
+<ul>
+<li><strong>Model bazowy</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Random Forest (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-42-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model                 accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                    &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Random Forest (train)    0.940     0.940  0.996  0.967   0.974</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Random Forest (test)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-43-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model                accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                   &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Random Forest (test)    0.899     0.913  0.979  0.945   0.715</code></pre>
+</div>
+</div>
+<p>W przypadku modelu bazowego, na zbiorze treningowym osiągnięto bardzo wysokie wartości wszystkich metryk: accuracy wyniosło 0.940, precision 0.940, recall aż 0.996, a f-measure 0.967. Wartość ROC AUC osiągnęła poziom 0.974, co wskazuje na bardzo dobrą zdolność modelu do rozróżniania klas. Wyniki te sugerują, że model prawie perfekcyjnie nauczył się rozpoznawać klasę pozytywną, a liczba błędów klasyfikacji była niska. Na zbiorze testowym uzyskano nieco niższe, ale nadal bardzo dobre wyniki: accuracy 0.899, precision 0.913, recall 0.979, f1-score 0.945, a ROC AUC 0.715. Choć wyniki są delikatnie słabsze niż w zbiorze treningowym, różnice są na tyle małe, że nie wskazują na przeuczenie modelu. Zachowana została wysoka stabilność predykcji.</p>
+<p>Macierz pomyłek pokazuje bardzo niską liczbę fałszywie negatywnych przypadków oraz wysoką liczbę poprawnych predykcji klasy pozytywnej, co w połączeniu z bardzo wysokim recall i f-measure świadczy o skuteczności modelu.</p>
+<ul>
+<li><strong>Model z tuningiem</strong></li>
+</ul>
+<p>Optymalizacji poddano trzy kluczowe parametry:</p>
+<ul>
+<li><p>mtry — liczba zmiennych losowo wybieranych do rozważenia na każdym etapie podziału drzewa,</p></li>
+<li><p>trees — całkowita liczba drzew w lesie,</p></li>
+<li><p>min_n — minimalna liczba obserwacji wymagana w liściu.</p></li>
+</ul>
+<p>Do wyznaczenia optymalnej kombinacji wartości tych parametrów zastosowano losową siatkę hiperparametrów (random grid search), w której dla każdego parametru zdefiniowano odpowiedni zakres wartości:</p>
+<ul>
+<li><p>mtry: od 2 do 10,</p></li>
+<li><p>trees: od 100 do 500,</p></li>
+<li><p>min_n: od 2 do 20.</p></li>
+</ul>
+<p>Z siatki losowo wygenerowano 20 różnych kombinacji hiperparametrów. Proces strojenia przeprowadzono z wykorzystaniem 5-krotnej walidacji krzyżowej.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 4
+   mtry trees min_n .config              
+  &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;chr&gt;                
+1     2   282     7 Preprocessor1_Model15</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Random Forest tuned (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-52-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model                       accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                          &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Random Forest tuned (train)    0.940     0.939  0.996  0.967   0.974</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Random Forest tuned (test)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-53-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model                      accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                         &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Random Forest tuned (test)    0.901     0.917  0.977  0.946   0.804</code></pre>
+</div>
+</div>
+<p>W przypadku modelu po tuningu, którego hiperparametry (liczba drzew, liczba zmiennych wybieranych przy podziale oraz minimalna liczba obserwacji w liściu) zostały zoptymalizowane, nie odnotowano istotnej poprawy wyników względem modelu bazowego. Na zbiorze treningowym metryki pozostały praktycznie identyczne: accuracy 0.940, precision 0.939, recall 0.996, f-measure 0.967, a ROC AUC 0.974. Natomiast na zbiorze testowym uzyskano nieco wyższe wyniki niż dla modelu bazowego: accuracy 0.901, precision 0.917, recall 0.977, f1-score 0.946, oraz istotnie lepszy ROC AUC na poziomie 0.804. To wskazuje na wyższą jakość ogólnej separacji klas i lepszą stabilność modelu po tuningu.</p>
+<p>Macierz pomyłek dla modelu strojonego potwierdza te wnioski – zarówno liczba fałszywie pozytywnych, jak i fałszywie negatywnych klasyfikacji jest stosunkowo niska. Model dobrze radzi sobie zarówno z rozpoznawaniem klasy dominującej, jak i klasy mniejszościowej.</p>
+</section>
+<section id="xgboost" class="level3">
+<h3 class="anchored" data-anchor-id="xgboost">XGBoost</h3>
+<p>XGBoost to zaawansowany algorytm zespołowy oparty na metodzie gradient boosting, który tworzy model predykcyjny przez iteracyjne dopasowywanie kolejnych drzew decyzyjnych. W przeciwieństwie do losowego lasu, gdzie drzewa są budowane niezależnie, w XGBoost każde nowe drzewo uczy się poprawiać błędy poprzednich, minimalizując funkcję straty za pomocą gradientu. Algorytm korzysta z technik regularyzacji, takich jak karanie złożoności drzew, co pozwala kontrolować przeuczenie i poprawia generalizację modelu.</p>
+<p>Do zalet XGBoost należą wysoka dokładność predykcji, odporność na przeuczenie dzięki regularyzacji oraz szybkie trenowanie dzięki optymalizacjom. Wady to mniejsza interpretowalność w porównaniu do prostszych modeli oraz konieczność strojenia wielu hiperparametrów, co może wymagać dodatkowego nakładu pracy.</p>
+<ul>
+<li><strong>Model bazowy</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: XGBoost (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-58-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model           accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;              &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 XGBoost (train)    0.910     0.918  0.986  0.951   0.836</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: XGBoost (test)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-59-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model          accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;             &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 XGBoost (test)    0.902     0.916  0.980  0.947   0.809</code></pre>
+</div>
+</div>
+<p>W przypadku modelu bazowego, wyniki na zbiorze treningowym były bardzo dobre: accuracy osiągnęło 0.910, precision 0.918, recall 0.986, F1-score 0.951, a wartość ROC AUC 0.836. Na zbiorze testowym metryki pozostały na zbliżonym poziomie: accuracy 0.902, precision 0.916, recall 0.980, F1-score 0.947, a ROC AUC 0.809. Taki układ wskazuje na dobrą zdolność generalizacji modelu – skuteczność predykcji na danych nieznanych jest prawie identyczna jak na danych treningowych.</p>
+<p>Macierze pomyłek pokazują dobrą separację klas na obu zbiorach.</p>
+<ul>
+<li><strong>Model z tuningiem</strong></li>
+</ul>
+<p>Optymalizacji poddano sześć parametrów:</p>
+<ul>
+<li><p>trees — liczba drzew w modelu,</p></li>
+<li><p>tree_depth — maksymalna głębokość pojedynczego drzewa,</p></li>
+<li><p>learn_rate — tempo uczenia,</p></li>
+<li><p>loss_reduction — parametr regulujący złożoność drzewa,</p></li>
+<li><p>mtry — liczba cech losowo wybieranych do rozważenia przy podziale,</p></li>
+<li><p>sample_size — odsetek próbek używanych do budowy pojedynczego drzewa.</p></li>
+</ul>
+<p>Zakresy wartości dla parametrów zdefiniowano następująco:</p>
+<ul>
+<li><p>trees: od 100 do 1000,</p></li>
+<li><p>tree_depth: domyślny zakres dopasowywany automatycznie,</p></li>
+<li><p>learn_rate: od 0.01 do 0.3,</p></li>
+<li><p>loss_reduction: dopasowywany dynamicznie,</p></li>
+<li><p>sample_size: proporcja próbek w zakresie od 0 do 1,</p></li>
+<li><p>mtry: dostosowany do zbioru treningowego.</p></li>
+</ul>
+<p>Z wykorzystaniem losowej siatki hiperparametrów wygenerowano 50 różnych konfiguracji. Strojenie przeprowadzono przy pomocy 5-krotnej walidacji krzyżowej.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 7
+   mtry trees tree_depth learn_rate loss_reduction sample_size .config          
+  &lt;int&gt; &lt;int&gt;      &lt;int&gt;      &lt;dbl&gt;          &lt;dbl&gt;       &lt;dbl&gt; &lt;chr&gt;            
+1     8   289          2       1.05          0.171       0.341 Preprocessor1_Mo…</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: XGBoost tuned (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-68-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model                 accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                    &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 XGBoost tuned (train)    0.910     0.918  0.986  0.951   0.836</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: XGBoost tuned (test)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-69-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model                accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                   &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 XGBoost tuned (test)    0.902     0.916  0.980  0.947   0.809</code></pre>
+</div>
+</div>
+<p>Po tuningu hiperparametrów (liczba drzew, głębokość, learning rate, mtry itp.) model osiągnął dokładnie te same wyniki: accuracy 0.910 (train) i 0.902 (test), precision 0.918 (train) i 0.916 (test), recall 0.986 (train) i 0.980 (test), F1-score 0.951 (train) i 0.947 (test), a także ten sam AUC: 0.836 (train) i 0.809 (test). Oznacza to, że tuning nie przyniósł poprawy wyników – prawdopodobnie już model bazowy był optymalnie dopasowany do danych.</p>
+</section>
+<section id="regresja-logistyczna" class="level3">
+<h3 class="anchored" data-anchor-id="regresja-logistyczna">Regresja logistyczna</h3>
+<p>Regresja logistyczna to klasyczny model statystyczny i uczenia maszynowego stosowany do problemów klasyfikacji binarnej. Model ten opisuje zależność między zestawem zmiennych niezależnych a prawdopodobieństwem wystąpienia zdarzenia z jednej z dwóch klas.</p>
+<p>W regresji logistycznej prawdopodobieństwo przypisania obserwacji do danej klasy jest modelowane za pomocą funkcji logistycznej (sigmoidalnej), która przekształca dowolną wartość rzeczywistą na przedział od 0 do 1. Parametry modelu są estymowane metodą największej wiarygodności, co pozwala na interpretację wpływu poszczególnych zmiennych na szanse wystąpienia zdarzenia.</p>
+<p>Do zalet regresji logistycznej należą prostota, szybkie trenowanie, łatwa interpretacja współczynników oraz możliwość oceny istotności zmiennych. Wadą jest założenie liniowej zależności pomiędzy cechami a logarytmem szans, co może ograniczać skuteczność modelu w przypadku bardziej złożonych nieliniowych zależności.</p>
+<ul>
+<li><strong>Model bazowy</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Logistic Regression (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-74-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model                       accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                          &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Logistic Regression (train)      0.9     0.909  0.986  0.946   0.776</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Logistic Regression (test)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-75-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model                      accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                         &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Logistic Regression (test)    0.900     0.911  0.984  0.946   0.785</code></pre>
+</div>
+</div>
+<p>Dla modelu bazowego, na zbiorze treningowym uzyskano accuracy 0.9, precision 0.909, recall 0.986, F1-score 0.946, oraz ROC AUC 0.776. Są to bardzo dobre wyniki, szczególnie jeśli chodzi o czułość, która wskazuje, że model skutecznie rozpoznaje klientów zainteresowanych ofertą banku. Na zbiorze testowym wartości metryk są niemal identyczne: accuracy 0.900, precision 0.911, recall 0.984, F1-score 0.946 oraz ROC AUC 0.785. Tak wysoka zgodność między zbiorem treningowym i testowym świadczy o braku przeuczenia – model dobrze generalizuje na danych nieznanych.</p>
+<p>Macierze pomyłek pokazują, że model bardzo dobrze radzi sobie z identyfikacją klasy pozytywnej, przy stosunkowo niewielkiej liczbie błędnych klasyfikacji.</p>
+<ul>
+<li><strong>Model z tuningiem</strong></li>
+</ul>
+<p>Optymalizacji poddano dwa parametry:</p>
+<ul>
+<li><p>penalty — współczynnik regularyzacji kontrolujący siłę kary nakładanej na złożoność modelu,</p></li>
+<li><p>mixture — parametr określający proporcję pomiędzy regularyzacją L1 (lasso) a L2 (ridge).</p></li>
+</ul>
+<p>Zakresy wartości dla parametrów zdefiniowano następująco:</p>
+<ul>
+<li><p>penalty: od -4 do 0 (w skali logarytmicznej od 10⁻⁴ do 1),</p></li>
+<li><p>mixture: od 0 do 1.</p></li>
+</ul>
+<p>Do optymalizacji zastosowano regularną siatkę hiperparametrów (grid_regular) z 5 poziomami dla każdego z parametrów. Strojenie przeprowadzono z wykorzystaniem 5-krotnej walidacji krzyżowej.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 3
+  penalty mixture .config              
+    &lt;dbl&gt;   &lt;dbl&gt; &lt;chr&gt;                
+1  0.0001    0.75 Preprocessor1_Model16</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Logistic Regression tuned (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-84-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model                             accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                                &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Logistic Regression tuned (train)    0.900     0.908  0.987  0.946   0.776</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: Logistic Regression tuned (test)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-85-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model                            accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                               &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 Logistic Regression tuned (test)    0.900     0.910  0.985  0.946   0.784</code></pre>
+</div>
+</div>
+<p>Po przeprowadzeniu tuningu hiperparametrów, model nie poprawił wyników – metryki dla modelu strojonego pozostały praktycznie takie same jak w wersji bazowej. W treningu odnotowano accuracy 0.900, precision 0.908, recall 0.987, F1-score 0.946, i ROC AUC 0.776. Wyniki testowe to: accuracy 0.900, precision 0.910, recall 0.985, F1-score 0.946, oraz ROC AUC 0.784. Tak wysoka spójność ponownie potwierdza brak przeuczenia i bardzo dobrą zdolność generalizacji.</p>
+<p>Macierze konfuzji dla modelu strojonego również pokazują dobre rozpoznawanie przypadków pozytywnych, choć nieco wzrasta liczba błędnych przypisań klasy pozytywnej.</p>
+<p>Tuning nie wpłynął znacząco na jakość predykcji.</p>
+</section>
+<section id="support-vector-machines-svm" class="level3">
+<h3 class="anchored" data-anchor-id="support-vector-machines-svm">Support Vector Machines (SVM)</h3>
+<p>Support Vector Machine (SVM) to popularny algorytm uczenia maszynowego, którego celem jest znalezienie optymalnej granicy decyzyjnej (hiperpłaszczyzny), która maksymalizuje margines między różnymi klasami danych. Dzięki temu SVM dąży do uzyskania jak najlepszego rozdzielenia między klasami, minimalizując ryzyko błędnej klasyfikacji.</p>
+<p>SVM jest szczególnie skuteczny w sytuacjach, gdy dane są wyraźnie rozdzielne lub prawie liniowo separowalne, ale dzięki zastosowaniu tzw. funkcji jądra (kernel) potrafi także radzić sobie z nieliniowymi granicami decyzyjnymi, przekształcając dane do przestrzeni o wyższej wymiarowości, gdzie klasy są łatwiejsze do rozdzielenia.</p>
+<p>Do zalet SVM należą wysoka skuteczność przy różnych typach danych, możliwość pracy w przestrzeniach wielowymiarowych oraz odporność na przeuczenie przy odpowiednim doborze parametrów. Wady to m.in. stosunkowo wysoki koszt obliczeniowy przy dużych zbiorach danych.</p>
+<ul>
+<li><strong>Model bazowy</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: SVM (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-89-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model       accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;          &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 SVM (train)    0.903     0.909  0.991  0.948   0.817</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: SVM (test)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-90-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model      accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;         &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 SVM (test)    0.898     0.907  0.985  0.945   0.708</code></pre>
+</div>
+</div>
+<p>Na zbiorze treningowym model osiągnął wysokie wyniki: dokładność (accuracy) wyniosła 0,903, precyzja 0,909, czułość (recall) aż 0,991, F1-score 0,948, a wartość AUC osiągnęła 0,817. Na zbiorze testowym wyniki były bardzo zbliżone, co świadczy o stabilności modelu: accuracy wyniosło 0,898, precision 0,907, recall 0,985, F1-score 0,945, a AUC 0,708. Wyniki modelu SVM na zbiorze testowym są niemal identyczne jak na zbiorze treningowym, co świadczy o dobrej generalizacji. Nie ma oznak przeuczenia.</p>
+<p>Macierze pomyłek pokazują dobrą skuteczność klasyfikacji na obu zbiorach. Na zbiorze treningowym model dobrze oddziela obie klasy - fałszywych negatywów jest bardzo niewiele, natomiast pojawia się umiarkowana liczba fałszywych pozytywów. Na zbiorze testowym rozkład błędów jest podobny, choć można zauważyć wzrost fałszywych pozytywów względem treningu.</p>
+<ul>
+<li><strong>Model z tuningiem</strong></li>
+</ul>
+<p>Z uwagi na ograniczenia sprzętowe oraz małą moc obliczeniową nie przeprowadzono tuningu modelu SVM, dlatego ocenie podlega wyłącznie wersja bazowa, z domyślnymi parametrami.</p>
+</section>
+<section id="mlp-multi-layer-perceptron" class="level3">
+<h3 class="anchored" data-anchor-id="mlp-multi-layer-perceptron">MLP – Multi-Layer Perceptron</h3>
+<p>Wielowarstwowa sieć neuronowa (MLP, ang. Multilayer Perceptron) to model uczenia maszynowego należący do rodziny sztucznych sieci neuronowych. Składa się z co najmniej trzech warstw: warstwy wejściowej, jednej lub więcej warstw ukrytych oraz warstwy wyjściowej. Każda warstwa zawiera wiele neuronów, które przetwarzają sygnały, stosując funkcje aktywacji, co pozwala modelowi uczyć się złożonych, nieliniowych zależności w danych. Proces uczenia odbywa się poprzez propagację sygnału do przodu oraz dostosowywanie wag połączeń między neuronami za pomocą algorytmu wstecznej propagacji błędu, który minimalizuje funkcję straty.</p>
+<p>Do zalet MLP należą zdolność do modelowania nieliniowych zależności oraz elastyczność w doborze architektury sieci, co pozwala na dopasowanie modelu do różnorodnych problemów.</p>
+<ul>
+<li><strong>Model bazowy</strong></li>
+</ul>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: MLP (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-104-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model       accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;          &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 MLP (train)    0.902     0.913  0.983  0.947   0.800</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: MLP (test)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-105-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model      accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;         &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 MLP (test)    0.899     0.913  0.980  0.945   0.788</code></pre>
+</div>
+</div>
+<p>Dla modelu bazowego, na zbiorze treningowym, dokładność predykcji (accuracy) wyniosła 0,902, precyzja 0,913, czułość 0,983, a miara F1 osiągnęła wartość 0,947. Wskaźnik AUC wyniósł 0,800, co świadczy o dobrej zdolności modelu do rozróżniania klas. Na zbiorze testowym metryki były niemal identyczne: accuracy wyniosło 0,899, precision 0,913, recall 0,980, F1-score 0,945, a AUC 0,788. Takie wyniki wskazują, że model dobrze generalizuje, ponieważ jakość predykcji nie pogarsza się znacząco na danych testowych.</p>
+<p>Macierze pomyłek dla modelu bazowego pokazują wysoką skuteczność zarówno na treningu, jak i teście.<br>
+Na zbiorze treningowym liczba błędów jest mała, natomiast część klientów, którzy nie zdecydowali się na założenie lokaty została błędnie zakwalifikowana jako “tak”. Na zbiorze testowym obserwujemy bardzo zbliżony rozkład błędów.</p>
+<p><strong>Model z tuningiem</strong></p>
+<p>Optymalizacji poddano trzy kluczowe parametry:</p>
+<ul>
+<li><p>hidden_units — liczba neuronów w warstwie ukrytej,</p></li>
+<li><p>penalty — współczynnik regularyzacji zapobiegający przeuczeniu,</p></li>
+<li><p>epochs — liczba epok, czyli pełnych iteracji uczenia sieci na całym zbiorze treningowym.</p></li>
+</ul>
+<p>Do wyznaczenia optymalnej kombinacji wartości tych parametrów zastosowano siatkę hiperparametrów, w której dla każdego z nich zdefiniowano odpowiedni zakres wartości:</p>
+<ul>
+<li><p>hidden_units: od 1 do 20,</p></li>
+<li><p>penalty: od -5 do 0,</p></li>
+<li><p>epochs: od 50 do 300.</p></li>
+</ul>
+<p>Z siatki wygenerowano różne kombinacje hiperparametrów. Proces strojenia przeprowadzono z wykorzystaniem 5-krotnej walidacji krzyżowej.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 4
+  hidden_units   penalty epochs .config              
+         &lt;int&gt;     &lt;dbl&gt;  &lt;int&gt; &lt;chr&gt;                
+1            5 0.0000343    118 Preprocessor1_Model07</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: MLP tuned (train)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-114-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model             accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;                &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 MLP tuned (train)    0.901     0.907  0.990  0.947   0.803</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Ewaluacja: MLP tuned (test)
+-------------------------------------------------- </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="projekt_files/figure-html/unnamed-chunk-115-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 6
+  model            accuracy precision recall f_meas roc_auc
+  &lt;chr&gt;               &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+1 MLP tuned (test)    0.898     0.906  0.987  0.945   0.790</code></pre>
+</div>
+</div>
+<p>Dla modelu po tuningu hiperparametrów uzyskano accuracy równe 0,901, precision 0,907, recall 0,990, F1-score 0,947 i AUC 0,803. Na zbiorze testowym metryki były również bardzo wysokie i praktycznie nie odbiegały od tych uzyskanych dla modelu bazowego: accuracy wyniosło 0,898, precision 0,906, recall 0,987, F1-score 0,945, a AUC 0,790.</p>
+<p>Również macierz pomyłek dla modelu strojonego potwierdza skuteczność predykcji. Większość obserwacji została poprawnie sklasyfikowana.</p>
+</section>
+</section>
+</section>
+<section id="podsumowanie" class="level1">
+<h1>Podsumowanie</h1>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-condensed table-hover caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption><strong>Wyniki metryk dla modeli bazowych</strong></caption>
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">model</th>
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">accuracy</th>
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">precision</th>
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">recall</th>
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">f_meas</th>
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">roc_auc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Tree (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8995750</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9050789</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9907284</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9459689</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7029677</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Tree (test)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8989801</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9060697</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9886426</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9455569</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7127256</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Random Forest (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9398907</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9395142</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9964077</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9671249</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9742241</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Random Forest (test)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8993443</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9133597</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9794745</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9452625</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7145257</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">XGBoost (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9095325</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9178579</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9863150</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9508559</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8357522</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">XGBoost (test)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9020155</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9158245</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9796114</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9466446</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8091710</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Logistic Regression (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9000000</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9086698</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9864518</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9459646</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7762993</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Logistic Regression (test)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9003157</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9106216</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9842638</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9460117</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7845331</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">SVM (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9032483</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9085660</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9906600</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9478388</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8169541</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">SVM (test)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8976445</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9071671</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9854953</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9447104</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7075482</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">MLP (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9017608</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9128363</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9831674</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9466974</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7998947</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">MLP (test)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8991015</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9130213</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9796114</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9451449</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7875084</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+<p>Analiza wyników modeli bazowych wykazała, że wszystkie algorytmy osiągnęły porównywalnie wysoką skuteczność klasyfikacji, a wartości accuracy i f-measure w przypadku zbioru testowego oscylowały wokół 90–95%. Najwyższe wartości tych metryk uzyskał model XGBoost, osiągając accuracy na poziomie 90,20%, f-measure wynoszące 94,66% oraz najwyższą wartość ROC AUC równą 0,809. Pozostałe modele, w tym Random Forest, MLP i regresja logistyczna, uzyskały nieco niższe, ale nadal wysokie wartości wskaźników, natomiast SVM charakteryzował się najniższym wynikiem ROC AUC na zbiorze testowym. Równocześnie, w przypadku większości modeli (drzewo decyzyjne, regresja logistyczna, SVM), wyniki uzyskane na zbiorze treningowym i testowym były bardzo zbliżone, co świadczy o dobrej generalizacji. W przypadku Random Forest i MLP zaobserwowano nieznacznie wyższe wartości metryk na zbiorze treningowym, co może sugerować delikatną tendencję do przeuczenia, jednak różnice te były niewielkie i akceptowalne.</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-condensed table-hover caption-top table-sm table-striped small" data-quarto-postprocess="true">
+<caption><strong>Wyniki metryk dla modeli z tuningiem</strong></caption>
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">model</th>
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">accuracy</th>
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">precision</th>
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">recall</th>
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">f_meas</th>
+<th data-quarto-table-cell-role="th" style="text-align: center; font-weight: bold; background-color: rgba(242, 242, 242, 255) !important;">roc_auc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Tree tuned (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9020947</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9125785</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9839201</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9469075</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7052227</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Tree tuned (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8993443</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9133597</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9794745</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9452625</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7145257</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Random Forest tuned (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9395568</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9394643</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9960656</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9669373</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9740658</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Random Forest tuned (test)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9010442</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9165918</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9774220</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9460301</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8041459</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">XGBoost tuned (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9095325</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9178579</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9863150</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9508559</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8357522</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">XGBoost tuned (test)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9020155</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9158245</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9796114</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9466446</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8091710</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Logistic Regression tuned (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8996661</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9079693</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9869650</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9458206</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7764158</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">Logistic Regression tuned (test)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8998300</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9097459</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9848112</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9457914</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7843186</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">MLP tuned (train)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9008197</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9067749</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9900099</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9465661</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8034975</td>
+</tr>
+<tr class="even">
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">MLP tuned (test)</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.8981302</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9064974</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9870005</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.9450377</td>
+<td style="text-align: center; border-bottom: 1px solid #ccc; border-left: 1px solid; border-right: 1px solid;">0.7898930</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+<p>Po dostrojeniu hiperparametrów model XGBoost utrzymał swoją przewagę, osiągając najwyższe wartości metryk: accuracy na poziomie 90,20%, f-measure równe 94,66% oraz najwyższy wskaźnik ROC AUC wynoszący 0,809. Świadczy to o tym, że już w konfiguracji bazowej model ten był bardzo dobrze dopasowany do danych, a przeprowadzony tuning pozwolił na utrzymanie jego wysokiej skuteczności i stabilności predykcji. Model Random Forest po strojeniach uzyskał niewielką poprawę, osiągając ROC AUC na poziomie 0,804, co uplasowało go na drugim miejscu pod względem jakości klasyfikacji. Pozostałe modele nie odnotowały istotnych zmian po przeprowadzeniu optymalizacji parametrów i ich wyniki pozostały na zbliżonym poziomie do uzyskanych wcześniej.</p>
+</section>
+<section id="wnioski" class="level1">
+<h1>Wnioski</h1>
+<p>Na podstawie przeprowadzonych analiz można sformułować następujące wnioski:</p>
+<ul>
+<li><p>Dane wykorzystane w analizie charakteryzowały się dużą liczbą obserwacji oraz szerokim zakresem zmiennych opisujących zarówno cechy demograficzne klientów, przebieg kampanii marketingowych, jak i wskaźniki makroekonomiczne. Wstępna analiza wykazała obecność wartości odstających oraz braków danych w postaci etykiety „unknown” w wielu zmiennych kategorycznych, które pozostawiono jako osobne kategorie.</p></li>
+<li><p>Ze względu na niezrównoważony rozkład klas (dominacja klientów, którzy nie założyli lokaty), kluczowe było zastosowanie wielu metryk oceny modeli, uwzględniających nie tylko accuracy, ale również precision, recall, f-measure i ROC AUC, które lepiej oddają skuteczność klasyfikacji w kontekście niezbalansowanych danych.</p></li>
+<li><p>Spośród wszystkich analizowanych modeli, najwyższą skutecznością klasyfikacyjną wykazał się algorytm XGBoost. Zarówno w wersji bazowej, jak i po dostrojeniu hiperparametrów osiągał on najwyższe wartości metryk, w szczególności ROC AUC, co potwierdza jego zdolność do skutecznego rozróżniania klientów zainteresowanych lokatą. Random Forest również osiągnął wysokie wyniki, jednak ustępował XGBoost pod względem jakości predykcji.</p></li>
+<li><p>Modele regresji logistycznej, SVM, MLP oraz drzewa decyzyjnego uzyskały zbliżoną skuteczność, jednak ich parametry klasyfikacyjne były nieco niższe. Jednocześnie, dla większości modeli uzyskano zrównoważone wyniki na zbiorze treningowym i testowym, co wskazuje na ich stabilność i brak istotnego przeuczenia.</p></li>
+<li><p>Wyniki projektu potwierdzają, że metody oparte na algorytmach ensemble oraz boosting, takie jak XGBoost, sprawdzają się szczególnie dobrze w zadaniach klasyfikacyjnych o dużym zróżnicowaniu zmiennych i umiarkowanym problemie niezbalansowania klas. Wykorzystanie tego typu modeli może stanowić cenne narzędzie wspomagające procesy decyzyjne w kampaniach marketingowych banków.</p></li>
+</ul>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

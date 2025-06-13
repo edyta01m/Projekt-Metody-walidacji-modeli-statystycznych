@@ -1,0 +1,1444 @@
+---
+title: "Modelowanie decyzji klientów bankowych na podstawie danych kampanii marketingowej – analiza wybranych algorytmów klasyfikacyjnych"
+author: "Edyta Margol"
+format: 
+  html:
+    toc: true
+    toc-title: "Spis treści"
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = FALSE)
+```
+
+```{r}
+set.seed(2025)
+library(rio)
+library(tidyr)
+library(ggplot2)
+library(ggcorrplot)
+library(dplyr)
+library(tidymodels)
+library(knitr)
+library(kableExtra)
+library(DT)
+```
+
+# Wstęp
+
+Celem niniejszego projektu było zbudowanie i porównanie wybranych modeli klasyfikacyjnych w zadaniu przewidywania decyzji klientów bankowych o wykupieniu lokaty terminowej na podstawie danych pochodzących z rzeczywistej kampanii marketingowej portugalskiego banku. Analizie poddano zbiór danych bank-additional-full.csv, udostępniony w repozytorium UCI Machine Learning Repository ([https://archive.ics.uci.edu/dataset/222/bank+marketing](#0)), który zawiera informacje o klientach, parametrach kontaktu oraz zmiennych makroekonomicznych z okresu prowadzonej kampanii. Dane te obejmują łącznie ponad 41 tysięcy obserwacji i 21 zmiennych opisujących zarówno cechy demograficzne klientów, jak i otoczenie gospodarcze.
+
+W ramach projektu przeprowadzono kompleksową eksploracyjną analizę danych (EDA), przygotowanie i wstępne przetwarzanie danych wejściowych, a następnie zastosowano oraz porównano skuteczność wybranych algorytmów klasyfikacyjnych, takich jak: drzewo decyzyjne, Random Forest, XGBoost, regresja logistyczna, maszyna wektorów nośnych (SVM) oraz wielowarstwowy perceptron (MLP). Ocenę skuteczności modeli przeprowadzono przy wykorzystaniu podstawowych miar jakości klasyfikacji, takich jak accuracy, precision, recall, f-measure, ROC AUC oraz macierz konfuzji.
+
+Zmienne w zbiorze opisują:
+
+-   dane klientów banku:
+
+    1 - **age**: wiek (zmienna numeryczna)
+
+    2 - **job** : zawód klienta (zmienna kategoryczna przyjmująca poziomy: "admin.", "blue-collar", "entrepreneur", "housemaid", "management", "retired", "self-employed", "services", "student", "technician", "unemployed", "unknown")
+
+    3 - **marital** : stan cywilny (zmienna kategoryczna przyjmująca poziomy: "divorced", "married", "single", "unknown" ; uwaga: "divorced" oznacza rozwiedziony lub owdowiały)
+
+    4 - **education**: wykształcenie (zmienna kategoryczna przyjmująca poziomy: "basic.4y", "basic.6y", "basic.9y", "high.school", "illiterate", "professional.course", "university.degree", "unknown")
+
+    5 - **default**: czy klient ma zaległości w spłatach kredytu? (zmienna kategoryczna przyjmująca poziomy: "no", "yes", "unknown")
+
+    6 - **housing**: czy klient posiada kredyt hipoteczny? (zmienna kategoryczna przyjmująca poziomy: "no", "yes", "unknown")
+
+    7 - **loan**: czy klient posiada inny kredyt konsumencki? (zmienna kategoryczna przyjmująca poziomy: "no", "yes", "unknown")
+
+-   dane związane z ostatnim kontaktem w ramach bieżącej kampanii:
+
+    8 - **contact**: rodzaj kontaktu (zmienna kategoryczna przyjmująca poziomy: "cellular", "telephone")
+
+    9 - **month**: miesiąc kontaktu (zmienna kategoryczna przyjmująca poziomy: "jan", "feb", "mar", ..., "nov", "dec")
+
+    10 - **day_of_week**: dzień kontaktu (zmienna kategoryczna przyjmująca poziomy: "mon", "tue", "wed", "thu", "fri")
+
+    11 - **duration**: czas trwania kontaktu w sekundach (zmienna numeryczna).
+
+-   inne atrybuty:
+
+    12 - **campaign**: liczba kontaktów nawiązanych podczas danej kampanii i z danym klientem (zmienna numeryczna, obejmuje ostatni kontakt)
+
+    13 - **pdays**: liczba dni, które upłynęły od ostatniego kontaktu z klientem w ramach poprzedniej kampanii (zmienna numeryczna; 999 oznacza, że nie kontaktowano się wcześniej z danym klientem)
+
+    14 - **previous**: liczba kontaktów nawiązanych przed daną kampanią z danym klientem (zmienna numeryczna)
+
+    15 - **poutcome**: rezultat poprzedniej kampanii marketingowej (zmienna kategoryczna przyjmująca poziomy: "failure", "nonexistent", "success")
+
+-   atrybuty kontekstu społecznego i gospodarczego
+
+    16 - **emp.var.rate**: wskaźnik zmienności zatrudnienia (employment variation rate) – wskaźnik kwartalny (zmienna numeryczna)
+
+    17 - **cons.price.idx**: wskaźnik cen konsumpcyjnych (consumer price index)– wskaźnik miesięczny (zmienna numeryczna)
+
+    18 - **cons.conf.idx**: wskaźnik zaufania konsumentów (consumer confidence index) – wskaźnik miesięczny (zmienna numeryczna)
+
+    19 - **euribor3m**: 3-miesięczna stopa Euribor – wskaźnik dzienny (zmienna numeryczna)
+
+    20 - **nr.employed**: liczba zatrudnionych osób (wskaźnik rynku pracy)– wskaźnik kwartalny (zmienna numeryczna)
+
+-   Zmienna wyjściowa:
+
+    21 - **y**: czy klient wykupił lokatę terminową? (zmienna binarna przyjmująca poziomy: "yes","no")
+
+Poniżej przedstawiono fragment danych.
+
+```{r}
+Dataset <- import("bank-additional-full.csv")
+datatable(head(Dataset))
+```
+
+## Eksploracyjna analiza danych (EDA) i wizualizacja danych
+
+-   **Struktura zmiennych:**
+
+```{r}
+str(Dataset)
+```
+
+Zbiór zawiera 41 176 obserwacji oraz 21 zmiennych. Dane zawierają zarówno zmienne numeryczne, jak i kategoryczne. Wszystkie zmienne kategoryczne są reprezentowane jako tekst (typ character), a zmienne numeryczne jako integer lub numeric.
+
+-   **Analiza statystyk opisowych:**
+
+```{r}
+summary(Dataset)
+```
+
+Na podstawie danych opisowych można zauważyć, że wiek badanych osób waha się od 17 do 98 lat, przy czym średnia wieku wynosi około 40 lat, a mediana to 38 lat, co sugeruje, że wwiększość badanych to osby młodsze i w średnim wieku. Górny kwartyl wskazuje, że 75% badanych było w wieku poniżej 47 lat, natomiast maksymalna wartość wskazuje na niewielką grupę osób starszych.
+
+Czas trwania rozmowy z klientem jest bardzo zróżnicowany i mieści się w przedziale od 0 do ponad 4900 sekund. Średni czas to około 258 sekund, a mediana 180 sekund. To sugeruje, że większość rozmów jest stosunkowo krótka, jednak występują pojedyncze, znacznie dłuższe kontakty.
+
+Liczba kontaktów z klientem w ramach kampanii waha się od 1 do aż 56, z medianą wynoszącą 2, co oznacza, że z większością osób kontaktowano się maksymalnie kilka razy.
+
+Jeśli chodzi o zmienną „pdays”, która wskazuje liczbę dni od ostatniego kontaktu w poprzedniej kampanii, mediana wynosi 999, co w tym kontekście oznacza brak wcześniejszego kontaktu dla większości osób.
+
+Z kolei liczba poprzednich kontaktów jest bardzo niska – średnia jest bliska zeru, co sugeruje, że tylko z niewielką częścią klientów kontaktowano się wcześniej.
+
+Zmienne makroekonomiczne takie jak stopa zmienności zatrudnienia, indeks cen konsumpcyjnych oraz indeks zaufania konsumentów pokazują, że dane obejmują okresy zarówno gorsze, jak i lepsze pod względem gospodarczym.
+
+Stopa procentowa EURIBOR na 3 miesiące waha się od około 0.6 do 5, a mediana wynosi około 4.86, co wskazuje na okresy wysokich stóp procentowych.
+
+Liczba zatrudnionych osób jest stosunkowo stabilna, oscylując wokół wartości 5200, co może odzwierciedlać stabilność rynku pracy w danym obszarze lub sektorze.
+
+-   **Sprawdzenie braków danych:**
+
+```{r, include=FALSE}
+sum(is.na(Dataset))
+```
+
+```{r, include=FALSE}
+cat_cols <- sapply(Dataset, is.character)
+
+#liczba wierszy, które mają co najmniej jeden "unknown" w kolumnach kategorycznych
+n_unknown_rows <- sum(apply(Dataset[, cat_cols], 1, function(row) any(row == "unknown")))
+n_unknown_rows
+```
+
+```{r,include=FALSE}
+#ile unknown jest w kazdej kolumnie osobno
+colSums(Dataset[, cat_cols] == "unknown")
+```
+
+Zbiór nie ma braków danych. Jednak we wszystkich zmiennych kategorycznych poziomy "unknown" można traktować jako braki danych bądź jako jedną z etykiet klasy. Liczba wierszy, które zawierają co najmniej jeden poziom "unknown" wynosi 10700, co stanowi ok. 26% wszystkich danych. Jest to zdecydowanie za dużo, żeby można było usunąć te wiersze. Dla zachowania rzetelności danych, pozostawimy poziomy "unknown" jako etykiety klasy.
+
+-   **Sprawdzenie duplikatów danych:**
+
+```{r}
+#sprawdzenie duplikatow danych
+sum(duplicated(Dataset))
+```
+
+W danych występuje 12 duplikatów.
+
+-   **Rozkłady oraz rozrzut wartości zmiennych numerycznych:**
+
+```{r, fig.width=10, fig.height=20}
+Dataset_long_density <- pivot_longer(Dataset, 
+                             cols = c(age, duration, emp.var.rate, cons.price.idx,
+                                      cons.conf.idx, euribor3m, nr.employed),
+                             names_to = "variable",
+                             values_to = "value")
+
+ggplot(Dataset_long_density, aes(x = value)) + 
+  geom_density(fill = "magenta", alpha = 0.5) +
+  facet_wrap(~ variable, scales = "free", ncol = 2, labeller = labeller(variable = function(x) paste("Gęstość ", x))) +
+  ggtitle("Gęstość różnych zmiennych") +
+  theme(strip.text = element_text(size = 8, face = "bold"),
+        plot.title = element_text(hjust = 0.5))  
+```
+
+```{r, fig.width=10, fig.height=15}
+Dataset_long_boxplot <- pivot_longer(Dataset, 
+                             cols = c(age, duration, campaign, pdays, previous),
+                             names_to = "variable",
+                             values_to = "value")
+ggplot(Dataset_long_boxplot, aes(x = variable, y = value)) + 
+  geom_boxplot() +
+  facet_wrap(~ variable, scales = "free", ncol = 2, labeller = labeller(variable = function(x) paste("Boxplot dla zmiennej", x))) +
+  ggtitle("Rozrzut wartości różnych zmiennych") +
+  theme(strip.text = element_text(size = 8, face = "bold"),  # Zmiana rozmiaru i stylu tytułów paneli
+        plot.title = element_text(hjust = 0.5))  # Wyśrodkowanie tytułu głównego
+```
+
+Rozkłady zmiennych numerycznych w analizowanym zbiorze są w większości skośne i charakteryzują się obecnością wartości odstających. Wiek klientów jest skupiony głównie w przedziale 30–50 lat, natomiast na wykresie rozrzutu wartości widać przypadki osób znacznie starszych, które tworzą wartości odstające.
+
+Czas trwania rozmowy telefonicznej jest zmienną o bardzo wyraźnym skośnym rozkładzie. Najwięcej rozmów trwało krótko, co widać po skupieniu wartości przy dolnym końcu skali, ale istnieją rozmowy trwające kilkadziesiąt minut, które odstają od reszty danych.
+
+Liczba kontaktów z klientem podczas kampanii również wykazuje silną asymetrię. Z większością klientów kontaktowano się jeden lub dwa razy, podczas gdy pojedyncze przypadki obejmują kilkanaście lub kilkadziesiąt prób kontaktu, co widać na wykresie jako odległe punkty odstające.
+
+Zmienne związane z wcześniejszymi kontaktami, takie jak previous i pdays, pokazują, że większość wartości skupia się przy zerze lub, w przypadku zmiennej pdays, dominującej kategorii 999, co sugeruje brak wcześniejszego kontaktu dla większości klientów. Rozrzut w tych zmiennych jest niewielki poza nielicznymi wyjątkami.
+
+Zmienne makroekonomiczne, takie jak wskaźnik zmienności zatrudnienia, indeks cen konsumpcyjnych, indeks zaufania konsumentów, stopa Euribor oraz liczba zatrudnionych, mają rozkłady znacznie bardziej zwarte i symetryczne. W ich przypadku nie zaobserwowano widocznych wartości odstających. Wykresy tych zmiennych pokazują stosunkowo wąskie zakresy, a dane koncentrują się wokół średnich wartości.
+
+-   **Rozkład zmiennych kategorycznych:**
+
+```{r, fig.width=10, fig.height=20}
+Dataset_cat_long <- pivot_longer(Dataset, 
+                                 cols = c(job, marital, education, default, housing, loan, contact, month, day_of_week, poutcome, y),
+                                 names_to = "variable",
+                                 values_to = "value")
+# Obliczamy liczebności i procenty
+cat_prop <- Dataset_cat_long %>%
+  group_by(variable, value) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(variable) %>%
+  mutate(prop = count / sum(count),
+         label = paste0(round(100 * prop, 1), "%"))
+
+# Wykres z etykietami procentowymi
+ggplot(cat_prop, aes(x = value, y = count)) + 
+  geom_bar(stat = "identity", fill = "magenta", alpha = 0.5) +
+  geom_text(aes(label = label), vjust = -0.5, size = 3, position = position_stack(vjust = 0.5)) +
+  facet_wrap(~ variable, ncol = 2, scales = "free", 
+             labeller = labeller(variable = function(x) paste("Kategorie", x))) +
+  ggtitle("Częstość kategorii różnych zmiennych") +
+  theme(strip.text = element_text(size = 10, face = "bold"),
+        plot.title = element_text(hjust = 0.5, size = 14),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Najczęściej występującymi zawodami w zbiorze są „admin.”, „technician” i „blue-collar”, które łącznie stanowią dużą część próby. Z kolei kategorie takie jak „student”, „housemaid” czy „self-employed” są reprezentowane w znacznie mniejszym stopniu.
+
+Jeśli chodzi o stan cywilny, dominującą grupę stanowią osoby zamężne lub żonate, a następnie osoby stanu wolnego i rozwiedzione/owdowiałe.
+
+W zmiennej education najliczniejszymi kategoriami są „high.school” oraz „university.degree”, jednak w zbiorze występuje też znaczący udział wartości „unknown”.
+
+Jeśli chodzi o zmienne finansowe: default, housing i loan, które opisują sytuację kredytową klienta, w większości przypadków klienci nie posiadają zaległości w spłacie kredytów ani dodatkowych zobowiązań finansowych, jednak w każdej z tych zmiennych występują też liczne wartości „unknown”, szczególnie w przypadku default.
+
+Zmienna contact, informująca o rodzaju kontaktu (telefon stacjonarny vs komórkowy), wskazuje, że zdecydowana większość interakcji odbywała się przez telefon komórkowy.
+
+Rozkład zmiennych month i day_of_week pokazuje, że kontakty były prowadzone intensywnie w maju, lipcu i sierpniu, a najwięcej połączeń odbywało się w środku tygodnia, zwłaszcza w środę i czwartek. Wzrost pozytywnych odpowiedzi w niektórych miesiącach (np. marzec, grudzień) może sugerować sezonowość w skuteczności kampanii.
+
+Zmienne związane z wcześniejszymi kampaniami, takie jak poutcome, pokazują, że dla większości klientów wynik wcześniejszych kampanii był oznaczony jako „nonexistent”, czyli brak wcześniejszych prób kontaktu.
+
+Na koniec warto zauważyć, że zmienna y, czyli zmienna docelowa, jest mocno niezrównoważona – zdecydowana większość klientów nie zdecydowała się na lokatę, co należy uwzględnić przy dalszym modelowaniu.
+
+-   **Macierz korelacji dla zmiennych numerycznych:**
+
+```{r}
+num_vars <- sapply(Dataset, is.numeric)
+Correlation_Variables <- Dataset[,num_vars]  
+Correlation_matrix <- round(cor(Correlation_Variables, method = "spearman"), 2) 
+p.mat_coefficient <- cor_pmat(Correlation_Variables)  
+ggcorrplot(Correlation_matrix, lab = TRUE, p.mat = p.mat_coefficient)
+```
+
+Do analizy korelacji między zmiennymi wykorzystano współczynnik korelacji Spearmana, co umożliwia uwzględnienie również nieliniowych relacji.
+
+Wyniki pokazały, że najsilniejsza dodatnia korelacja występuje pomiędzy zmiennymi euribor3m, nr.employed oraz emp.var.rate.
+
+Pozostałe zmienne, takie jak age, campaign, pdays, previous oraz duration, nie wykazują silnych korelacji między sobą ani z pozostałymi cechami.
+
+-   **Wykresy słupkowe zmiennych kategorycznych względem y**:
+
+```{r, fig.width=10, fig.height=20}
+Dataset_cat_long$y <- rep(Dataset$y, times = length(unique(Dataset_cat_long$variable)))
+
+# Przygotowanie danych: oblicz proporcje dla każdej kategorii + etykiety
+data_prop <- Dataset_cat_long %>%
+  group_by(variable, value, y) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(variable, value) %>%
+  mutate(prop = count / sum(count),
+         label = paste0(round(100 * prop, 1), "%"))
+
+ggplot(data_prop, aes(x = value, y = prop, fill = y)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = label),
+            position = position_stack(vjust = 0.5),
+            size = 3, color = "white") +
+  facet_wrap(~ variable, scales = "free_x",ncol = 2) +
+  labs(title = "Proporcje odpowiedzi y dla różnych poziomów zmiennych kategorycznych",
+       y = "Proporcja", x = "Kategoria") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.text = element_text(size = 10, face = "bold"),
+        plot.title = element_text(hjust = 0.5, size = 14))
+```
+
+Po analizie wykresów słupkowych, przedstawiających rozkład zmiennych kategorycznych względem zmiennej docelowej y, można zauważyć różnice w odpowiedziach y w zależności od zawodu klienta. Największy odsetek odpowiedzi „yes” występował wśród studentów ("student"), pracowników z branży usługowej ("services"), pokojówek ("housemaid") oraz kadry zarządzającej ("management"). Z kolei grupą zawodową, która najrzadziej decydowała się na założenie lokaty, byli emeryci.
+
+Podobne zależności widoczne są w przypadku zmiennej marital. Osoby stanu wolnego częściej podejmowały decyzję o założeniu lokaty w porównaniu do osób zamężnych.
+
+W kategorii education można zauważyć, że klienci z wykształceniem wyższym wykazywały większą skłonność do podjęcia lokaty w porównaniu do pozostałych osób.
+
+Po analizie zmiennych związanych z sytuacją kredytową: housing, loan i default, mozna stwierdzić, że klienci nieposiadający kredytu (hipotecznego bądź konsumenckiego) oraz nieposiadający zaległości w spłacie kredytów byli bardziej skłonni do założenia lokaty.
+
+Co ciekawe, również sposób kontaktu z klientem miał znaczenie. Wśród klientów, z którymi kontaktowano się przez telefon komórkowy odnotowano wyższy odsetek odpowiedzi twierdzących niż wśród tych, z którymi kontaktowano się przez telefon stacjonarny.
+
+Analiza zmiennych month i day_of_week ukazała sezonowość w odpowiedziach klientów. W niektórych miesiącach – takich jak październik, wrzesień czy kwiecień– odsetek odpowiedzi pozytywnych był wyraźnie wyższy niż w pozostałych. Podobnie, w niektóre dni tygodnia – zwłaszcza we wtorek i środę – skuteczność kontaktu była nieco wyższa niż w poniedziałki czy piątki.
+
+Na szczególną uwagę zasługuje zmienna poutcome, która wskazuje wynik poprzedniej kampanii. Klienci, którzy zdecydowali się na założenie lokaty w poprzedniej kampanii, znacznie częściej odpowiadali „yes” również w bieżącej kampanii.
+
+-   **Boxploty zmiennych numerycznych względem y:**
+
+```{r, fig.width=10, fig.height=15}
+Dataset_long_boxplot$y <- rep(Dataset$y, times = length(unique(Dataset_long_boxplot$variable)))
+
+ggplot(Dataset_long_boxplot, aes(x = y, y = value, fill = y)) +
+  geom_boxplot() +
+  facet_wrap(~ variable, scales = "free_y",ncol = 2) +
+  labs(title = "Rozkład zmiennych numerycznych względem y") +
+  theme(strip.text = element_text(size = 10))
+```
+
+W przypadku age rozkłady w obu grupach są do siebie zbliżone. Mediany wieku są porównywalne. Widoczny jest szeroki rozrzut wieku oraz pojedyncze wartości odstające w górnym zakresie wieku.
+
+W przypadku zmiennej duration rozkład jest zróżnicowany między grupami. Rozrzut wartości dla osób, które nie założyły lokaty jest większy, a na wykresie widocznych jest wiele wartości odstających.
+
+Dla zmiennej campaign, która opisuje liczbę kontaktów w ramach bieżącej kampanii, rozrzut wartości również jest większy dla osób, które nie założyły lokaty, a na wykresie widocznych jest wiele wartości odstających.
+
+Jeśli chodzi o zmienną pdays, w obu grupach dominuje wartość 999, co oznacza, że z większością klientów nie było wcześniejszego kontaktu. Rozkład jest więc silnie skupiony na jednej wartości i nie widać istotnych różnic między grupami.
+
+Podobny rozkład obserwujemy w przypadku zmiennej *previous* — w obu grupach dominują wartości zerowe, jednak pojawiają się również wartości odstające, które odpowiadają klientom, z którymi wcześniej nawiązano większą liczbę kontaktów.
+
+## Czyszczenie danych
+
+Czyszczenie danych obejmowało:
+
+-   usunięcie duplikatów danych
+
+```{r}
+Dataset <- Dataset[-which(duplicated(Dataset)),]
+```
+
+-   usunięcie zmiennej duration - modele mają za zadanie przewidywać czy klient zdecyduje sie na założenie lokaty, jeszcze przed rozmową z nim. Natomiast czas trwania rozmowy jest znany dopiero po zakończeniu rozmowy. Z tego względu, należy usunąć tą zmienną, aby wyniki były wiarygodne.
+
+```{r}
+Dataset <- Dataset %>% select(-duration)
+```
+
+-   zamianę poziomów zmiennych kategorycznych,
+
+```{r}
+#kodowanie dla zmiennych yes/no/unknown (zmienne „default”, „housing” i „loan”)
+Dataset[, c("default", "housing", "loan")] <- lapply(Dataset[, c("default", "housing", "loan")], function(x) {
+  factor(x, levels = c("no", "yes", "unknown"), labels = c(0, 1, -1))
+})
+
+#Kodowanie etykiet porządkowych (Label Encoding)
+Dataset$education <- factor(Dataset$education, 
+                            levels = c("illiterate", "basic.4y", "basic.6y", 
+                                       "basic.9y", "high.school", 
+                                       "university.degree", "professional.course",
+                                       "unknown"),
+                            ordered = TRUE)
+
+Dataset$month <- factor(trimws(Dataset$month), 
+                        levels = c("mar", "apr", "may", "jun", "jul", "aug", "sep",
+                                   "oct", "nov", "dec"), 
+                        ordered = TRUE)
+
+Dataset$day_of_week <- factor(trimws(Dataset$day_of_week), 
+                              levels = c("mon", "tue", "wed", "thu", "fri"), 
+                              ordered = TRUE)
+
+
+#kodowanie zmiennej poutcome
+Dataset$poutcome <- factor(Dataset$poutcome, 
+                           levels = c("failure", "nonexistent", "success"), 
+                           labels = c(0, -1, 1))
+
+
+Dataset$y <- factor(Dataset$y, levels = c("no", "yes"), labels = c(0, 1))
+```
+
+-   utworzenie zbioru danych Dataset2, dla potrzeb niektórych z modeli, w którym:
+
+    -usunięto zmienne silnie skorelowane (emp.var.rate i euribor3m),
+
+    -przekształcono pdays na zmienną binarną - przyjmującą wartość 1, jeżeli wystąpił wcześniejszy kontakt z klientem oraz 0, jezeli kontaktu nie było,
+
+    -usunięto ekstremalne obserwacje w campaign i zastąpiono je wartością 0.95 percentyla,
+
+```{r}
+Dataset2 <- Dataset %>% select(-c(emp.var.rate,euribor3m))
+Dataset2$"prev_contact" <- ifelse(Dataset$pdays!=999, 1, 0)
+Dataset2 <- Dataset2 %>% select(-pdays)
+
+#zastąpienie ekstremalnie wysokich wartości wartością 0.95 percentyla
+cap_upper <- function(x, quant = 0.95) {
+  upper <- quantile(x, probs = quant)
+  x[x > upper] <- upper
+  return(x)
+}
+Dataset2$campaign <- cap_upper(Dataset2$campaign)
+```
+
+```{r}
+#ponowne sprawdzenie macierzy korelacji
+num_vars2 <- sapply(Dataset2, is.numeric)
+Correlation_Variables2 <- Dataset2[,num_vars2]  
+Correlation_matrix2 <- round(cor(Correlation_Variables2, method = "spearman"), 2) 
+p.mat_coefficient2 <- cor_pmat(Correlation_Variables2)  
+ggcorrplot(Correlation_matrix2, lab = TRUE, p.mat = p.mat_coefficient2)
+```
+
+-   podział danych - dla pierwotnego zbioru;
+
+```{r}
+split <- initial_split(Dataset, prop = 0.8, strata = y)
+train_data <- training(split)
+test_data <- testing(split)
+```
+
+-   podział danych - dla Dataset2.
+
+```{r}
+split2 <- initial_split(Dataset2, prop = 0.8, strata = y)
+train_data2 <- training(split2)
+test_data2 <- testing(split2)
+```
+
+## Budowa modeli
+
+W projekcie przeprowadzono porównanie skuteczności sześciu modeli klasyfikacyjnych: drzewa decyzyjnego, lasu losowego (Random Forest), XGBoost, regresji logistycznej, maszyny wektorów nośnych (SVM) oraz wielowarstwowej sieci neuronowej (MLP). Modele oceniano zarówno w wersji bazowej (z domyślnymi ustawieniami), jak i po strojeniu hiperparametrów, wykorzystując pięć podstawowych metryk:
+
+-   accuracy - stosunek liczby poprawnie sklasyfikowanych obserwacji do ogólnej liczby wszystkich próbek,
+
+-   precision - stosunek poprawnie przewidzianych pozytywnych przypadków do wszystkich przypadków zaklasyfikowanych jako pozytywne,
+
+-   recall - stosunek poprawnie wykrytych pozytywnych przypadków do wszystkich faktycznych pozytywnych przypadków,
+
+-   f-measure - średnia harmoniczna precyzji i czułości,
+
+-   ROC AUC - zdolność modelu do rozróżniania klas bez względu na konkretny próg decyzyjny.
+
+oraz macierz konfuzji (tabela podsumowująca wyniki klasyfikacji, pokazująca liczbę poprawnych i błędnych przewidywań dla każdej klasy).
+
+```{r}
+#funkcja do ewaluacji modeli
+evaluate_model <- function(model_fit, test_data, model_name = "Model") {
+  # Ustawienie klas: 0 = negatywna, 1 = pozytywna
+  test_data$y <- factor(test_data$y, levels = c("0", "1"))
+
+  # Predykcje: prawdopodobieństwa i klasy
+  predictions <- predict(model_fit, test_data, type = "prob") %>%
+    bind_cols(predict(model_fit, test_data)) %>%
+    bind_cols(test_data %>% select(y))
+
+  # Macierz pomyłek
+  cat(paste0("\nEwaluacja: ", model_name, "\n"))
+  cat(strrep("-", 50), "\n")
+
+  print(
+    conf_mat(predictions, truth = y, estimate = .pred_class) %>%
+      autoplot(type = "heatmap") +
+      labs(title = paste("Macierz pomyłek:", model_name)) +
+      scale_fill_gradient(low = "white", high = "blue")
+  )
+
+  # Metryki klasyfikacyjne (dla klas)
+  class_metrics <- metric_set(accuracy, precision, recall, f_meas)
+  result_class <- class_metrics(predictions, truth = y, estimate = .pred_class)
+
+  # Metryka ROC AUC (dla prawdopodobieństw)
+  result_auc <- roc_auc(predictions, truth = y, .pred_1, event_level = "second")
+
+  # Połączenie wyników
+  result_all <- bind_rows(result_class, result_auc) %>%
+    select(.metric, .estimate) %>%
+    pivot_wider(names_from = .metric, values_from = .estimate) %>%
+    mutate(model = model_name) %>%
+    select(model, everything())
+
+  return(result_all)
+}
+```
+
+### Drzewo decyzyjne
+
+Drzewa decyzyjne to jedna z najpopularniejszych i intuicyjnych metod uczenia maszynowego, wykorzystywanych zarówno w zadaniach klasyfikacyjnych, jak i regresyjnych. Model ma postać hierarchicznego drzewa, gdzie na każdym węźle podejmowana jest decyzja o podziale danych na podstawie wartości jednej z cech. Celem kolejnych podziałów jest maksymalne rozdzielenie obserwacji należących do różnych klas. Model jest intuicyjny i łatwy do interpretacji, ponieważ przedstawia ciąg logicznych decyzji prowadzących do przypisania obserwacji do odpowiedniej klasy. Do zalet drzewa decyzyjnego należy prostota, brak wymagań co do normalizacji danych i możliwość pracy zarówno na zmiennych liczbowych, jak i kategorycznych.
+
+-   **Model bazowy** **- z domyślnymi parametrami**
+
+```{r}
+# Obliczenie wag klas
+class_weights <- train_data %>%
+  count(y) %>%
+  mutate(weight = 1 / n) %>%
+  select(y, weight)
+
+# Dołączenie wag do zbioru
+train_data <- train_data %>%
+  left_join(class_weights, by = "y")
+test_data <- test_data %>%
+  left_join(class_weights, by = "y")
+
+#Recipe - balansowanie
+rec_bal <- recipe(y ~ ., data = train_data) %>% 
+  update_role(weight, new_role = "case_weight")
+```
+
+```{r}
+#Model drzewa
+tree_mod <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+```
+
+```{r}
+#Workflow
+tree_wf <- workflow() %>%
+  add_recipe(rec_bal) %>%
+  add_model(tree_mod)
+```
+
+```{r}
+#Dopasowanie modelu
+tree_fit <- fit(tree_wf, data = train_data)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_tree_results <- evaluate_model(tree_fit, train_data, "Tree (train)")
+train_tree_results
+```
+
+```{r}
+#ewaluacja modelu - zbior testowy
+test_tree_results <- evaluate_model(tree_fit, test_data, "Tree (test)")
+test_tree_results
+```
+
+Dla modelu bazowego, na zbiorze treningowym osiągnięto bardzo wysoką dokładność (accuracy) na poziomie 0.900, a na zbiorze testowym wyniosła ona 0.899, co wskazuje na niemal identyczną skuteczność predykcji w obu przypadkach. Wartość precision również była bardzo wysoka – 0.905 w treningu i 0.906 w teście. Jeszcze wyższy okazał się recall, który wyniósł 0.991 na treningu i 0.989 na teście, co oznacza, że model potrafił poprawnie wykryć niemal wszystkie przypadki klientów, którzy zdecydowali się na lokatę. Wysokie wartości precision i recall przełożyły się na wysoki wynik F1-score: 0.946 w obu zbiorach. Wskaźnik AUC wynosił odpowiednio 0.703 (train) i 0.713 (test), co świadczy o umiarkowanej zdolności modelu do rozróżniania klas.
+
+Macierz pomyłek dla modelu bazowego pokazuje W obu zbiorach większość klientów, którzy rzeczywiście zdecydowali się na lokatę, została poprawnie sklasyfikowana. Liczba fałszywie negatywnych (czyli błędów, gdzie klient faktycznie założył lokatę, a model przewidział "nie") była bardzo niska.
+
+Macierze pomyłek dla tego modelu pokazują, że zarówno na zbiorze treningowym, jak i testowym model dobrze rozpoznaje przypadki obu klas.
+
+-   **Model z tuningiem**
+
+Optymalizacji poddano trzy kluczowe parametry kontrolujące złożoność drzewa:
+
+-   cost_complexity — współczynnik kary za złożoność drzewa, odpowiadający za przycinanie (pruning) i eliminowanie nadmiernie skomplikowanych podziałów,
+
+-   tree_depth — maksymalną głębokość drzewa, ograniczającą liczbę kolejnych podziałów,
+
+-   min_n — minimalną liczbę obserwacji w liściu, pozwalającą kontrolować wielkość końcowych podzbiorów.
+
+Do wyboru optymalnej kombinacji hiperparametrów zastosowano siatkę regularną, w której ustalono następujące zakresy wartości:
+
+-   cost_complexity: od $10^{-4}$ do $10^{-1}$,
+
+-   tree_depth: od 1 do 10,
+
+-   min_n: od 2 do 20.
+
+Dla każdego z parametrów przyjęto po 3 poziomy wartości, dzięki czemu przeszukano wszystkie możliwe kombinacje w sposób systematyczny. Proces strojenia przeprowadzono przy użyciu 5-krotnej walidacji krzyżowej.
+
+```{r}
+#model
+tree_mod_t <- decision_tree(
+  cost_complexity = tune(),
+  tree_depth = tune(),
+  min_n = tune()
+) %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+```
+
+```{r}
+#Workflow
+tree_wf_t <- workflow() %>%
+  add_recipe(rec_bal) %>%
+  add_model(tree_mod_t)
+```
+
+```{r}
+#siatka regularna
+tree_grid <- grid_regular(
+  cost_complexity(range = c(-4, -1)),
+  tree_depth(range = c(1, 10)),
+  min_n(range = c(2, 20)),
+  levels = 3
+)
+```
+
+```{r}
+#5-krotna walidacja krzyżowa
+cv <- vfold_cv(train_data, v = 5, strata = y)
+```
+
+```{r}
+tree_tuned <- tune_grid(
+  tree_wf_t,
+  resamples = cv,
+  grid = tree_grid,
+  metrics = metric_set(roc_auc, accuracy, f_meas)
+)
+```
+
+```{r}
+#wybranie najlepszego modelu
+best_tree <- select_best(tree_tuned, metric = "accuracy")
+```
+
+```{r}
+#finalny workflow
+final_tree <- finalize_workflow(tree_wf_t, best_tree)
+```
+
+```{r}
+#trenowanie finalnego modelu
+tree_fit <- fit(final_tree, data = train_data)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_tree_t_results <- evaluate_model(tree_fit, train_data, "Tree tuned (train)")
+train_tree_t_results
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+test_tree_t_results <- evaluate_model(tree_fit, test_data, "Tree tuned (train)")
+test_tree_t_results
+```
+
+W przypadku modelu po tuningu, wyniki również były bardzo wysokie. Dokładność na zbiorze treningowym wyniosła 0.902, a na teście 0.899. Precision było identyczne w obu zbiorach i wyniosło 0.913, a recall nieco spadło w porównaniu do modelu bazowego, ale nadal było bardzo wysokie – 0.984 na treningu i 0.979 na teście. F1-score pozostał na poziomie 0.947 (train) i 0.945 (test), co wskazuje na zachowanie dobrego balansu między czułością a precyzją. Wskaźniki AUC również lekko wzrosły w stosunku do modelu bazowego – odpowiednio 0.705 i 0.715. Wysoka stabilność metryk pomiędzy zbiorem treningowym i testowym wskazuje, że model jest dobrze dopasowany i nie występuje zjawisko przeuczenia.
+
+Również w tym przypadku, analiza macierzy pomyłek potwierdza skuteczność modelu – model dobrze radził sobie z rozpoznawaniem zarówno klasy pozytywnej, jak i negatywnej. Liczba fałszywie pozytywnych błędów uległa lekkiemu zmniejszeniu względem modelu bazowego. Zarówno na treningu, jak i teście uzyskano bardzo podobne rozkłady błędów.
+
+### Random Forest
+
+Random Forest to algorytm zespołowy (ensemble), który buduje wiele niezależnych drzew decyzyjnych i łączy ich predykcje w celu uzyskania bardziej stabilnego i dokładnego modelu klasyfikacyjnego. Każde drzewo trenowane jest na losowo wybranym podzbiorze danych (bootstrap), a na każdym etapie podziału węzła losowana jest ograniczona liczba cech, spośród których wybierana jest optymalna. Dzięki temu poszczególne drzewa są zróżnicowane, a łączenie ich prognoz (najczęściej poprzez głosowanie większościowe) pozwala redukować wariancję i ograniczać ryzyko przeuczenia.
+
+Do zalet Random Forest należą: wysoka odporność na przeuczenie, dobra skuteczność nawet na danych o dużej liczbie cech i brak konieczności intensywnego przygotowania danych. Wady to m.in. mniejsza interpretowalność w porównaniu do pojedynczego drzewa oraz dłuższy czas trenowania przy dużych zbiorach danych.
+
+-   **Model bazowy**
+
+```{r}
+rf_mod <- rand_forest() %>%
+  set_engine("ranger", importance = "impurity") %>% 
+  set_mode("classification")
+```
+
+```{r}
+#Workflow
+rf_wf <- workflow() %>%
+  add_recipe(rec_bal) %>%
+  add_model(rf_mod)
+```
+
+```{r}
+#dopasowanie na zbiorze treningowym 
+rf_fit <- fit(rf_wf, data = train_data)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_rf_results <- evaluate_model(rf_fit, train_data, "Random Forest (train)")
+train_rf_results
+```
+
+```{r}
+#ewaluacja modelu - zbior testowy
+test_rf_results <- evaluate_model(tree_fit, test_data, "Random Forest (test)")
+test_rf_results
+```
+
+W przypadku modelu bazowego, na zbiorze treningowym osiągnięto bardzo wysokie wartości wszystkich metryk: accuracy wyniosło 0.940, precision 0.940, recall aż 0.996, a f-measure 0.967. Wartość ROC AUC osiągnęła poziom 0.974, co wskazuje na bardzo dobrą zdolność modelu do rozróżniania klas. Wyniki te sugerują, że model prawie perfekcyjnie nauczył się rozpoznawać klasę pozytywną, a liczba błędów klasyfikacji była niska. Na zbiorze testowym uzyskano nieco niższe, ale nadal bardzo dobre wyniki: accuracy 0.899, precision 0.913, recall 0.979, f1-score 0.945, a ROC AUC 0.715. Choć wyniki są delikatnie słabsze niż w zbiorze treningowym, różnice są na tyle małe, że nie wskazują na przeuczenie modelu. Zachowana została wysoka stabilność predykcji.
+
+Macierz pomyłek pokazuje bardzo niską liczbę fałszywie negatywnych przypadków oraz wysoką liczbę poprawnych predykcji klasy pozytywnej, co w połączeniu z bardzo wysokim recall i f-measure świadczy o skuteczności modelu.
+
+-   **Model z tuningiem**
+
+Optymalizacji poddano trzy kluczowe parametry:
+
+-   mtry — liczba zmiennych losowo wybieranych do rozważenia na każdym etapie podziału drzewa,
+
+-   trees — całkowita liczba drzew w lesie,
+
+-   min_n — minimalna liczba obserwacji wymagana w liściu.
+
+Do wyznaczenia optymalnej kombinacji wartości tych parametrów zastosowano losową siatkę hiperparametrów (random grid search), w której dla każdego parametru zdefiniowano odpowiedni zakres wartości:
+
+-   mtry: od 2 do 10,
+
+-   trees: od 100 do 500,
+
+-   min_n: od 2 do 20.
+
+Z siatki losowo wygenerowano 20 różnych kombinacji hiperparametrów. Proces strojenia przeprowadzono z wykorzystaniem 5-krotnej walidacji krzyżowej.
+
+```{r}
+#Model Random Forest
+rf_mod_t <- rand_forest(
+  mode = "classification",
+  mtry = tune(),
+  trees = tune(),
+  min_n = tune()
+) %>%
+  set_engine("ranger", importance = "impurity")
+```
+
+```{r}
+#Workflow
+rf_wf_t <- workflow() %>%
+  add_recipe(rec_bal) %>%
+  add_model(rf_mod_t)
+```
+
+```{r}
+#siatka hiperparametrów
+rf_grid <- grid_random(
+  mtry(range = c(2, 10)),
+  trees(range = c(100,500)),
+  min_n(range = c(2, 20)),
+  size = 20
+)
+```
+
+```{r}
+# library(doParallel)
+# cl <- makePSOCKcluster(parallel::detectCores() - 5)
+# #tuning
+# rf_tuned <- tune_grid(
+#   rf_wf_t,
+#   resamples = cv,
+#   grid = rf_grid,
+#   metrics = metric_set(roc_auc, accuracy, f_meas)
+# )
+# stopCluster(cl)
+# registerDoSEQ()  # wyłączamy równoległość, wracamy do normalnego trybu
+```
+
+```{r}
+#wybór najlepszego zestawu hiperparametrów
+#best_params <- select_best(rf_tuned, metric = "accuracy")
+
+#zapis do pliku rds
+#saveRDS(best_params, "best_rf_params.rds")
+
+#wczytanie
+best_params <- readRDS("best_rf_params.rds")
+
+best_params
+```
+
+```{r}
+#finalizacja modelu
+final_rf <- finalize_workflow(rf_wf, best_params)
+```
+
+```{r}
+#zapisywanie modelu
+#saveRDS(final_rf,"model_fitting_rf.rds")
+
+#wczytywanie modelu
+final_rf <- readRDS("model_fitting_rf.rds")
+```
+
+```{r}
+#dopasowanie na zbiorze treningowym 
+rf_fit <- fit(final_rf, data = train_data)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_rf_t_results <- evaluate_model(rf_fit, train_data, "Random Forest tuned (train)")
+train_rf_t_results
+```
+
+```{r}
+#ewaluacja modelu - zbior testowy
+test_rf_t_results <- evaluate_model(rf_fit, test_data, "Random Forest tuned (test)")
+test_rf_t_results
+```
+
+W przypadku modelu po tuningu, którego hiperparametry (liczba drzew, liczba zmiennych wybieranych przy podziale oraz minimalna liczba obserwacji w liściu) zostały zoptymalizowane, nie odnotowano istotnej poprawy wyników względem modelu bazowego. Na zbiorze treningowym metryki pozostały praktycznie identyczne: accuracy 0.940, precision 0.939, recall 0.996, f-measure 0.967, a ROC AUC 0.974. Natomiast na zbiorze testowym uzyskano nieco wyższe wyniki niż dla modelu bazowego: accuracy 0.901, precision 0.917, recall 0.977, f1-score 0.946, oraz istotnie lepszy ROC AUC na poziomie 0.804. To wskazuje na wyższą jakość ogólnej separacji klas i lepszą stabilność modelu po tuningu.
+
+Macierz pomyłek dla modelu strojonego potwierdza te wnioski – zarówno liczba fałszywie pozytywnych, jak i fałszywie negatywnych klasyfikacji jest stosunkowo niska. Model dobrze radzi sobie zarówno z rozpoznawaniem klasy dominującej, jak i klasy mniejszościowej.
+
+### XGBoost
+
+XGBoost to zaawansowany algorytm zespołowy oparty na metodzie gradient boosting, który tworzy model predykcyjny przez iteracyjne dopasowywanie kolejnych drzew decyzyjnych. W przeciwieństwie do losowego lasu, gdzie drzewa są budowane niezależnie, w XGBoost każde nowe drzewo uczy się poprawiać błędy poprzednich, minimalizując funkcję straty za pomocą gradientu. Algorytm korzysta z technik regularyzacji, takich jak karanie złożoności drzew, co pozwala kontrolować przeuczenie i poprawia generalizację modelu.
+
+Do zalet XGBoost należą wysoka dokładność predykcji, odporność na przeuczenie dzięki regularyzacji oraz szybkie trenowanie dzięki optymalizacjom. Wady to mniejsza interpretowalność w porównaniu do prostszych modeli oraz konieczność strojenia wielu hiperparametrów, co może wymagać dodatkowego nakładu pracy.
+
+-   **Model bazowy**
+
+```{r}
+#Recipe - kodowanie i balansowanie
+rec_enc_bal <- recipe(y ~ ., data = train_data) %>%
+  update_role(weight, new_role = "case_weight") %>% 
+  step_integer(all_ordered(), zero_based = TRUE) %>% #label encoding
+  step_dummy(all_nominal_predictors(),-all_ordered()) # one-hot encoding
+```
+
+```{r}
+#Model
+xgb_mod <- boost_tree() %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+```
+
+```{r}
+#Workflow
+xgb_wf <- workflow() %>%
+  add_recipe(rec_enc_bal) %>%
+  add_model(xgb_mod)
+```
+
+```{r}
+# trenowanie na całym zbiorze treningowym
+xgb_fit <- fit(xgb_wf, data = train_data)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_xgb_results <- evaluate_model(xgb_fit, train_data, "XGBoost (train)")
+train_xgb_results
+```
+
+```{r}
+#ewaluacja modelu - zbior testowy
+test_xgb_results <- evaluate_model(xgb_fit, test_data, "XGBoost (test)")
+test_xgb_results
+```
+
+W przypadku modelu bazowego, wyniki na zbiorze treningowym były bardzo dobre: accuracy osiągnęło 0.910, precision 0.918, recall 0.986, F1-score 0.951, a wartość ROC AUC 0.836. Na zbiorze testowym metryki pozostały na zbliżonym poziomie: accuracy 0.902, precision 0.916, recall 0.980, F1-score 0.947, a ROC AUC 0.809. Taki układ wskazuje na dobrą zdolność generalizacji modelu – skuteczność predykcji na danych nieznanych jest prawie identyczna jak na danych treningowych.
+
+Macierze pomyłek pokazują dobrą separację klas na obu zbiorach.
+
+-   **Model z tuningiem**
+
+Optymalizacji poddano sześć parametrów:
+
+-   trees — liczba drzew w modelu,
+
+-   tree_depth — maksymalna głębokość pojedynczego drzewa,
+
+-   learn_rate — tempo uczenia,
+
+-   loss_reduction — parametr regulujący złożoność drzewa,
+
+-   mtry — liczba cech losowo wybieranych do rozważenia przy podziale,
+
+-   sample_size — odsetek próbek używanych do budowy pojedynczego drzewa.
+
+Zakresy wartości dla parametrów zdefiniowano następująco:
+
+-   trees: od 100 do 1000,
+
+-   tree_depth: domyślny zakres dopasowywany automatycznie,
+
+-   learn_rate: od 0.01 do 0.3,
+
+-   loss_reduction: dopasowywany dynamicznie,
+
+-   sample_size: proporcja próbek w zakresie od 0 do 1,
+
+-   mtry: dostosowany do zbioru treningowego.
+
+Z wykorzystaniem losowej siatki hiperparametrów wygenerowano 50 różnych konfiguracji. Strojenie przeprowadzono przy pomocy 5-krotnej walidacji krzyżowej.
+
+```{r}
+#Model
+xgb_mod_t <- boost_tree(
+  trees = tune(),           
+  tree_depth = tune(),
+  learn_rate = tune(),
+  loss_reduction = tune(),
+  mtry = tune(),
+  sample_size = tune()
+) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+```
+
+```{r}
+#Workflow
+xgb_wf_t <- workflow() %>%
+  add_recipe(rec_enc_bal) %>%
+  add_model(xgb_mod_t)
+```
+
+```{r}
+#siatka losowa, ale z równomiernie rozłożonymi punktami
+xgb_grid <- grid_latin_hypercube(
+  trees(range = c(100, 1000)),
+  tree_depth(),
+  learn_rate(range = c(0.01, 0.3)),
+  loss_reduction(),
+  sample_size = sample_prop(),
+  finalize(mtry(), train_data),
+  size = 50
+)
+```
+
+```{r}
+# cl <- makePSOCKcluster(parallel::detectCores() - 5)
+# #tuning
+# xgb_tuned <- tune_grid(
+#   xgb_wf_t,
+#   resamples = cv,
+#   grid = xgb_grid,
+#   metrics = metric_set(roc_auc, accuracy, f_meas)
+# )
+# stopCluster(cl)
+# registerDoSEQ()  # wyłączamy równoległość, wracamy do normalnego trybu
+```
+
+```{r}
+# wybór najlepszego zestawu hiperparametrów
+#best_xgb <- select_best(xgb_tuned, metric = "accuracy")
+
+#zapis do pliku rds
+#saveRDS(best_xgb, "best_xgb_params.rds")
+
+#wczytanie
+best_xgb <- readRDS("best_xgb_params.rds")
+
+best_xgb
+```
+
+```{r}
+# finalizacja workflowu
+final_xgb <- finalize_workflow(xgb_wf, best_xgb)
+```
+
+```{r}
+#zapisywanie modelu
+#saveRDS(final_xgb,"model_fitting_xgb.rds")
+
+#wczytywanie modelu
+final_xgb <- readRDS("model_fitting_xgb.rds")
+```
+
+```{r}
+# trenowanie na całym zbiorze treningowym
+xgb_fit <- fit(final_xgb, data = train_data)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_xgb_t_results <- evaluate_model(xgb_fit, train_data, "XGBoost tuned (train)")
+train_xgb_t_results
+```
+
+```{r}
+#ewaluacja modelu - zbior testowy
+test_xgb_t_results <- evaluate_model(xgb_fit, test_data, "XGBoost tuned (test)")
+test_xgb_t_results
+```
+
+Po tuningu hiperparametrów (liczba drzew, głębokość, learning rate, mtry itp.) model osiągnął dokładnie te same wyniki: accuracy 0.910 (train) i 0.902 (test), precision 0.918 (train) i 0.916 (test), recall 0.986 (train) i 0.980 (test), F1-score 0.951 (train) i 0.947 (test), a także ten sam AUC: 0.836 (train) i 0.809 (test). Oznacza to, że tuning nie przyniósł poprawy wyników – prawdopodobnie już model bazowy był optymalnie dopasowany do danych.
+
+### Regresja logistyczna
+
+Regresja logistyczna to klasyczny model statystyczny i uczenia maszynowego stosowany do problemów klasyfikacji binarnej. Model ten opisuje zależność między zestawem zmiennych niezależnych a prawdopodobieństwem wystąpienia zdarzenia z jednej z dwóch klas.
+
+W regresji logistycznej prawdopodobieństwo przypisania obserwacji do danej klasy jest modelowane za pomocą funkcji logistycznej (sigmoidalnej), która przekształca dowolną wartość rzeczywistą na przedział od 0 do 1. Parametry modelu są estymowane metodą największej wiarygodności, co pozwala na interpretację wpływu poszczególnych zmiennych na szanse wystąpienia zdarzenia.
+
+Do zalet regresji logistycznej należą prostota, szybkie trenowanie, łatwa interpretacja współczynników oraz możliwość oceny istotności zmiennych. Wadą jest założenie liniowej zależności pomiędzy cechami a logarytmem szans, co może ograniczać skuteczność modelu w przypadku bardziej złożonych nieliniowych zależności.
+
+-   **Model bazowy**
+
+```{r}
+# Obliczenie wag klas
+class_weights2 <- train_data2 %>%
+  count(y) %>%
+  mutate(weight = 1 / n) %>%
+  select(y, weight)
+
+# Dołączenie wag do zbioru
+train_data2 <- train_data2 %>%
+  left_join(class_weights2, by = "y")
+test_data2 <- test_data2 %>%
+  left_join(class_weights2, by = "y")
+```
+
+```{r}
+#Recipe-kodowanie, skalowanie i balansowanie
+rec_enc_norm_bal <- recipe(y ~ ., data = train_data2) %>%
+  update_role(weight, new_role = "case_weight") %>% 
+  step_integer(all_ordered(), zero_based = TRUE) %>% #label encoding
+  step_dummy(all_nominal_predictors(),-all_ordered()) %>%     # one-hot encoding
+  step_normalize(all_numeric_predictors())     # standaryzacja
+```
+
+```{r}
+#Model
+log_mod <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+```
+
+```{r}
+#workflow
+log_wf <- workflow() %>%
+  add_recipe(rec_enc_norm_bal) %>%
+  add_model(log_mod)
+
+log_fit <- fit(log_wf, data = train_data2)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_log_results <- evaluate_model(log_fit, train_data2, "Logistic Regression (train)")
+train_log_results
+```
+
+```{r}
+#ewaluacja modelu - zbior testowy
+test_log_results <- evaluate_model(log_fit, test_data2, "Logistic Regression (test)")
+test_log_results
+```
+
+Dla modelu bazowego, na zbiorze treningowym uzyskano accuracy 0.9, precision 0.909, recall 0.986, F1-score 0.946, oraz ROC AUC 0.776. Są to bardzo dobre wyniki, szczególnie jeśli chodzi o czułość, która wskazuje, że model skutecznie rozpoznaje klientów zainteresowanych ofertą banku. Na zbiorze testowym wartości metryk są niemal identyczne: accuracy 0.900, precision 0.911, recall 0.984, F1-score 0.946 oraz ROC AUC 0.785. Tak wysoka zgodność między zbiorem treningowym i testowym świadczy o braku przeuczenia – model dobrze generalizuje na danych nieznanych.
+
+Macierze pomyłek pokazują, że model bardzo dobrze radzi sobie z identyfikacją klasy pozytywnej, przy stosunkowo niewielkiej liczbie błędnych klasyfikacji.
+
+-   **Model z tuningiem**
+
+Optymalizacji poddano dwa parametry:
+
+-   penalty — współczynnik regularyzacji kontrolujący siłę kary nakładanej na złożoność modelu,
+
+-   mixture — parametr określający proporcję pomiędzy regularyzacją L1 (lasso) a L2 (ridge).
+
+Zakresy wartości dla parametrów zdefiniowano następująco:
+
+-   penalty: od -4 do 0 (w skali logarytmicznej od 10⁻⁴ do 1),
+
+-   mixture: od 0 do 1.
+
+Do optymalizacji zastosowano regularną siatkę hiperparametrów (grid_regular) z 5 poziomami dla każdego z parametrów. Strojenie przeprowadzono z wykorzystaniem 5-krotnej walidacji krzyżowej.
+
+```{r}
+#Model z tuningiem
+log_mod_t <- logistic_reg(
+  penalty = tune(),
+  mixture = tune()
+) %>%
+  set_engine("glmnet") %>%
+  set_mode("classification")
+```
+
+```{r}
+log_wf_t <- workflow() %>%
+  add_recipe(rec_enc_norm_bal) %>%
+  add_model(log_mod_t)
+```
+
+```{r}
+#siatka parametrów
+grid <- grid_regular(
+  penalty(range = c(-4, 0)),
+  mixture(range = c(0, 1)),
+  levels = 5
+)
+```
+
+```{r}
+cv2 <- vfold_cv(train_data2, v = 5, strata = y)
+```
+
+```{r}
+#tuning
+log_tuned <- tune_grid(
+  log_wf_t,
+  resamples = cv2,
+  grid = grid,
+  metrics = metric_set(roc_auc, accuracy, recall, precision),
+  control = control_grid(save_pred = TRUE)
+)
+```
+
+```{r}
+#Najlepszy model
+best_log <- select_best(log_tuned, metric ="accuracy")
+best_log
+```
+
+```{r}
+#finalny model
+log_final_wf <- finalize_workflow(log_wf_t, best_log)
+```
+
+```{r}
+#Fit model na całych danych treningowych
+log_final_fit <- fit(log_final_wf, data = train_data2)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_log_t_results <- evaluate_model(log_final_fit, train_data2, "Logistic Regression tuned (train)")
+train_log_t_results
+```
+
+```{r}
+#ewaluacja modelu - zbior testowy
+test_log_t_results <- evaluate_model(log_final_fit, test_data2, "Logistic Regression tuned (test)")
+test_log_t_results
+```
+
+Po przeprowadzeniu tuningu hiperparametrów, model nie poprawił wyników – metryki dla modelu strojonego pozostały praktycznie takie same jak w wersji bazowej. W treningu odnotowano accuracy 0.900, precision 0.908, recall 0.987, F1-score 0.946, i ROC AUC 0.776. Wyniki testowe to: accuracy 0.900, precision 0.910, recall 0.985, F1-score 0.946, oraz ROC AUC 0.784. Tak wysoka spójność ponownie potwierdza brak przeuczenia i bardzo dobrą zdolność generalizacji.
+
+Macierze konfuzji dla modelu strojonego również pokazują dobre rozpoznawanie przypadków pozytywnych, choć nieco wzrasta liczba błędnych przypisań klasy pozytywnej.
+
+Tuning nie wpłynął znacząco na jakość predykcji.
+
+### Support Vector Machines (SVM)
+
+Support Vector Machine (SVM) to popularny algorytm uczenia maszynowego, którego celem jest znalezienie optymalnej granicy decyzyjnej (hiperpłaszczyzny), która maksymalizuje margines między różnymi klasami danych. Dzięki temu SVM dąży do uzyskania jak najlepszego rozdzielenia między klasami, minimalizując ryzyko błędnej klasyfikacji.
+
+SVM jest szczególnie skuteczny w sytuacjach, gdy dane są wyraźnie rozdzielne lub prawie liniowo separowalne, ale dzięki zastosowaniu tzw. funkcji jądra (kernel) potrafi także radzić sobie z nieliniowymi granicami decyzyjnymi, przekształcając dane do przestrzeni o wyższej wymiarowości, gdzie klasy są łatwiejsze do rozdzielenia.
+
+Do zalet SVM należą wysoka skuteczność przy różnych typach danych, możliwość pracy w przestrzeniach wielowymiarowych oraz odporność na przeuczenie przy odpowiednim doborze parametrów. Wady to m.in. stosunkowo wysoki koszt obliczeniowy przy dużych zbiorach danych.
+
+-   **Model bazowy**
+
+```{r}
+#Model
+svm_mod <- svm_rbf() %>%
+  set_engine("kernlab") %>%
+  set_mode("classification")
+```
+
+```{r}
+#workflow
+svm_wf <- workflow() %>%
+  add_recipe(rec_enc_norm_bal) %>%
+  add_model(svm_mod)
+```
+
+```{r}
+# dopasowanie
+#svm_fit <- fit(svm_wf, data = train_data2)
+
+#zapis modelu
+#saveRDS(svm_fit, "svm.rds")
+#wczytanie modelu
+svm_fit <- readRDS("svm.rds")
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_svm_results <- evaluate_model(svm_fit, train_data2, "SVM (train)")
+train_svm_results
+```
+
+```{r}
+#ewaluacja modelu - zbiór testowy
+test_svm_results <- evaluate_model(svm_fit, test_data2, "SVM (test)")
+test_svm_results
+```
+
+Na zbiorze treningowym model osiągnął wysokie wyniki: dokładność (accuracy) wyniosła 0,903, precyzja 0,909, czułość (recall) aż 0,991, F1-score 0,948, a wartość AUC osiągnęła 0,817. Na zbiorze testowym wyniki były bardzo zbliżone, co świadczy o stabilności modelu: accuracy wyniosło 0,898, precision 0,907, recall 0,985, F1-score 0,945, a AUC 0,708. Wyniki modelu SVM na zbiorze testowym są niemal identyczne jak na zbiorze treningowym, co świadczy o dobrej generalizacji. Nie ma oznak przeuczenia.
+
+Macierze pomyłek pokazują dobrą skuteczność klasyfikacji na obu zbiorach. Na zbiorze treningowym model dobrze oddziela obie klasy - fałszywych negatywów jest bardzo niewiele, natomiast pojawia się umiarkowana liczba fałszywych pozytywów. Na zbiorze testowym rozkład błędów jest podobny, choć można zauważyć wzrost fałszywych pozytywów względem treningu.
+
+-   **Model z tuningiem**
+
+Z uwagi na ograniczenia sprzętowe oraz małą moc obliczeniową nie przeprowadzono tuningu modelu SVM, dlatego ocenie podlega wyłącznie wersja bazowa, z domyślnymi parametrami.
+
+```{r}
+#Model
+# svm_mod_t <- svm_rbf(
+#   cost = tune(),
+#   rbf_sigma = tune()
+# ) %>%
+#   set_engine("kernlab") %>%
+#   set_mode("classification")
+```
+
+```{r}
+#workflow
+# svm_wf_t <- workflow() %>%
+#   add_recipe(rec_enc_norm_bal) %>%
+#   add_model(svm_mod_t)
+```
+
+```{r}
+#siatka hiperparametrów
+# svm_grid <- grid_latin_hypercube(
+#   rbf_sigma(range = c(-5, 1)),
+#   size = 50
+# )
+```
+
+```{r}
+#tuning
+# cl <- makePSOCKcluster(parallel::detectCores() - 5)
+# registerDoParallel(cl)
+# svm_tuned <- tune_grid(
+#   svm_wf_t,
+#   resamples = cv2,
+#   grid = svm_grid,
+#   metrics = metric_set(roc_auc, accuracy, f_meas)
+# )
+# stopCluster(cl)
+# registerDoSEQ()  # wyłączamy równoległość, wracamy do normalnego trybu
+```
+
+```{r}
+#najlepszy model
+# best_svm <- select_best(svm_tuned, "accuracy")
+# 
+# #zapis do pliku rds
+# saveRDS(best_svm, "best_svm_params.rds")
+# 
+# #wczytanie
+# #best_svm <- readRDS("best_svm_params.rds")
+# 
+# best_svm
+```
+
+```{r}
+# finalizacja
+#final_svm <- finalize_workflow(svm_wf_t, best_svm)
+```
+
+```{r}
+#zapisywanie modelu
+#saveRDS(final_svm,"model_fitting_svm.rds")
+
+#wczytywanie modelu
+#final_svm <- readRDS("model_fitting_svm.rds")
+```
+
+```{r}
+# dopasowanie
+#svm_fit <- fit(final_svm, data = train_data2)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+#evaluate_model(svm_fit, train_data2, "Model SVM tuned")
+```
+
+```{r}
+#ewaluacja modelu - zbior testowy
+#evaluate_model(svm_fit, test_data2, "Model SVM tuned")
+```
+
+### MLP – Multi-Layer Perceptron
+
+Wielowarstwowa sieć neuronowa (MLP, ang. Multilayer Perceptron) to model uczenia maszynowego należący do rodziny sztucznych sieci neuronowych. Składa się z co najmniej trzech warstw: warstwy wejściowej, jednej lub więcej warstw ukrytych oraz warstwy wyjściowej. Każda warstwa zawiera wiele neuronów, które przetwarzają sygnały, stosując funkcje aktywacji, co pozwala modelowi uczyć się złożonych, nieliniowych zależności w danych. Proces uczenia odbywa się poprzez propagację sygnału do przodu oraz dostosowywanie wag połączeń między neuronami za pomocą algorytmu wstecznej propagacji błędu, który minimalizuje funkcję straty.
+
+Do zalet MLP należą zdolność do modelowania nieliniowych zależności oraz elastyczność w doborze architektury sieci, co pozwala na dopasowanie modelu do różnorodnych problemów.
+
+-   **Model bazowy**
+
+```{r}
+mlp_mod <- mlp() %>%
+ set_engine("nnet") %>%
+ set_mode("classification")
+```
+
+```{r}
+mlp_wf <- workflow() %>%
+  add_recipe(rec_enc_norm_bal) %>%
+  add_model(mlp_mod)
+```
+
+```{r}
+# dopasowanie
+mlp_fit <- fit(mlp_wf, data = train_data2)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_mlp_results <- evaluate_model(mlp_fit, train_data2, "MLP (train)")
+train_mlp_results
+```
+
+```{r}
+#ewaluacja modelu - zbior testowy
+test_mlp_results <- evaluate_model(mlp_fit, test_data2, "MLP (test)")
+test_mlp_results
+```
+
+Dla modelu bazowego, na zbiorze treningowym, dokładność predykcji (accuracy) wyniosła 0,902, precyzja 0,913, czułość 0,983, a miara F1 osiągnęła wartość 0,947. Wskaźnik AUC wyniósł 0,800, co świadczy o dobrej zdolności modelu do rozróżniania klas. Na zbiorze testowym metryki były niemal identyczne: accuracy wyniosło 0,899, precision 0,913, recall 0,980, F1-score 0,945, a AUC 0,788. Takie wyniki wskazują, że model dobrze generalizuje, ponieważ jakość predykcji nie pogarsza się znacząco na danych testowych.
+
+Macierze pomyłek dla modelu bazowego pokazują wysoką skuteczność zarówno na treningu, jak i teście.\
+Na zbiorze treningowym liczba błędów jest mała, natomiast część klientów, którzy nie zdecydowali się na założenie lokaty została błędnie zakwalifikowana jako "tak". Na zbiorze testowym obserwujemy bardzo zbliżony rozkład błędów.
+
+**Model z tuningiem**
+
+Optymalizacji poddano trzy kluczowe parametry:
+
+-   hidden_units — liczba neuronów w warstwie ukrytej,
+
+-   penalty — współczynnik regularyzacji zapobiegający przeuczeniu,
+
+-   epochs — liczba epok, czyli pełnych iteracji uczenia sieci na całym zbiorze treningowym.
+
+Do wyznaczenia optymalnej kombinacji wartości tych parametrów zastosowano siatkę hiperparametrów, w której dla każdego z nich zdefiniowano odpowiedni zakres wartości:
+
+-   hidden_units: od 1 do 20,
+
+-   penalty: od -5 do 0,
+
+-   epochs: od 50 do 300.
+
+Z siatki wygenerowano różne kombinacje hiperparametrów. Proces strojenia przeprowadzono z wykorzystaniem 5-krotnej walidacji krzyżowej.
+
+```{r}
+mlp_mod_t <- mlp(
+ hidden_units = tune(),
+ penalty = tune(),
+ epochs = tune()
+) %>%
+ set_engine("nnet") %>%
+ set_mode("classification")
+```
+
+```{r}
+mlp_wf_t <- workflow() %>%
+  add_recipe(rec_enc_norm_bal) %>%
+  add_model(mlp_mod_t)
+```
+
+```{r}
+mlp_grid <- grid_latin_hypercube(
+  hidden_units(range = c(1, 20)),
+  penalty(range = c(-5, 0)),     # log10(L2 regularization): np. 10^-5 do 1
+  epochs(range = c(50, 300)),
+  size = 20
+)
+```
+
+```{r}
+# cl <- makePSOCKcluster(parallel::detectCores() - 5)
+# registerDoParallel(cl)
+# 
+# mlp_tuned <- tune_grid(
+#   mlp_wf_t,
+#   resamples = cv2,
+#   grid = mlp_grid,
+#   metrics = metric_set(roc_auc, accuracy, f_meas)
+# )
+# 
+# stopCluster(cl)
+# registerDoSEQ()  # wyłączamy równoległość, wracamy do normalnego trybu
+```
+
+```{r}
+# wybór najlepszych parametrów
+#best_mlp <- select_best(mlp_tuned, metric = "accuracy")
+
+#zapis
+#saveRDS(best_mlp, "best_mlp_params.rds")
+#wczytanie
+best_mlp <- readRDS("best_mlp_params.rds")
+
+best_mlp
+```
+
+```{r}
+# finalizacja
+final_mlp <- finalize_workflow(mlp_wf, best_mlp)
+```
+
+```{r}
+#zapisywanie modelu
+#saveRDS(final_mlp,"model_fitting_mlp.rds")
+
+#wczytywanie modelu
+final_mlp <- readRDS("model_fitting_mlp.rds")
+```
+
+```{r}
+# dopasowanie
+mlp_fit <- fit(final_mlp, data = train_data2)
+```
+
+```{r}
+#ewaluacja modelu - zbior treningowy
+train_mlp_t_results <- evaluate_model(mlp_fit, train_data2, "MLP tuned (train)")
+train_mlp_t_results
+```
+
+```{r}
+#ewaluacja modelu - zbior testowy
+test_mlp_t_results <- evaluate_model(mlp_fit, test_data2, "MLP tuned (test)")
+test_mlp_t_results
+```
+
+Dla modelu po tuningu hiperparametrów uzyskano accuracy równe 0,901, precision 0,907, recall 0,990, F1-score 0,947 i AUC 0,803. Na zbiorze testowym metryki były również bardzo wysokie i praktycznie nie odbiegały od tych uzyskanych dla modelu bazowego: accuracy wyniosło 0,898, precision 0,906, recall 0,987, F1-score 0,945, a AUC 0,790.
+
+Również macierz pomyłek dla modelu strojonego potwierdza skuteczność predykcji. Większość obserwacji została poprawnie sklasyfikowana.
+
+# Podsumowanie
+
+```{r}
+all_model_metrics <- bind_rows(train_tree_results, test_tree_results, train_rf_results, test_rf_results, train_xgb_results,test_xgb_results,train_log_results, test_log_results, train_svm_results, test_svm_results, train_mlp_results, test_mlp_results)
+
+all_model_metrics %>%
+  kable("html", 
+        caption = "<div style='color:black; text-align:center;'><b>Wyniki metryk dla modeli bazowych</b></div>", 
+        align = "c", 
+        escape = FALSE) %>%
+  kable_styling(
+    bootstrap_options = c("condensed", "hover"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#f2f2f2") %>%
+  row_spec(1:nrow(all_model_metrics), extra_css = "border-bottom: 1px solid #ccc;") %>%
+  column_spec(1:ncol(all_model_metrics), border_left = TRUE, border_right = TRUE)
+```
+
+Analiza wyników modeli bazowych wykazała, że wszystkie algorytmy osiągnęły porównywalnie wysoką skuteczność klasyfikacji, a wartości accuracy i f-measure w przypadku zbioru testowego oscylowały wokół 90–95%. Najwyższe wartości tych metryk uzyskał model XGBoost, osiągając accuracy na poziomie 90,20%, f-measure wynoszące 94,66% oraz najwyższą wartość ROC AUC równą 0,809. Pozostałe modele, w tym Random Forest, MLP i regresja logistyczna, uzyskały nieco niższe, ale nadal wysokie wartości wskaźników, natomiast SVM charakteryzował się najniższym wynikiem ROC AUC na zbiorze testowym. Równocześnie, w przypadku większości modeli (drzewo decyzyjne, regresja logistyczna, SVM), wyniki uzyskane na zbiorze treningowym i testowym były bardzo zbliżone, co świadczy o dobrej generalizacji. W przypadku Random Forest i MLP zaobserwowano nieznacznie wyższe wartości metryk na zbiorze treningowym, co może sugerować delikatną tendencję do przeuczenia, jednak różnice te były niewielkie i akceptowalne.
+
+```{r}
+all_tuned_model_metrics <- bind_rows(train_tree_t_results, test_tree_t_results, train_rf_t_results, test_rf_t_results, train_xgb_t_results,test_xgb_t_results,train_log_t_results, test_log_t_results, train_mlp_t_results, test_mlp_t_results)
+
+all_tuned_model_metrics %>%
+  kable("html", 
+        caption = "<div style='color:black; text-align:center;'><b>Wyniki metryk dla modeli z tuningiem</b></div>", 
+        align = "c", 
+        escape = FALSE) %>%
+  kable_styling(
+    bootstrap_options = c("condensed", "hover"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#f2f2f2") %>%
+  row_spec(1:nrow(all_tuned_model_metrics), extra_css = "border-bottom: 1px solid #ccc;") %>%
+  column_spec(1:ncol(all_tuned_model_metrics), border_left = TRUE, border_right = TRUE)
+```
+
+Po dostrojeniu hiperparametrów model XGBoost utrzymał swoją przewagę, osiągając najwyższe wartości metryk: accuracy na poziomie 90,20%, f-measure równe 94,66% oraz najwyższy wskaźnik ROC AUC wynoszący 0,809. Świadczy to o tym, że już w konfiguracji bazowej model ten był bardzo dobrze dopasowany do danych, a przeprowadzony tuning pozwolił na utrzymanie jego wysokiej skuteczności i stabilności predykcji. Model Random Forest po strojeniach uzyskał niewielką poprawę, osiągając ROC AUC na poziomie 0,804, co uplasowało go na drugim miejscu pod względem jakości klasyfikacji. Pozostałe modele nie odnotowały istotnych zmian po przeprowadzeniu optymalizacji parametrów i ich wyniki pozostały na zbliżonym poziomie do uzyskanych wcześniej.
+
+# Wnioski
+
+Na podstawie przeprowadzonych analiz można sformułować następujące wnioski:
+
+-   Dane wykorzystane w analizie charakteryzowały się dużą liczbą obserwacji oraz szerokim zakresem zmiennych opisujących zarówno cechy demograficzne klientów, przebieg kampanii marketingowych, jak i wskaźniki makroekonomiczne. Wstępna analiza wykazała obecność wartości odstających oraz braków danych w postaci etykiety „unknown” w wielu zmiennych kategorycznych, które pozostawiono jako osobne kategorie.
+
+-   Ze względu na niezrównoważony rozkład klas (dominacja klientów, którzy nie założyli lokaty), kluczowe było zastosowanie wielu metryk oceny modeli, uwzględniających nie tylko accuracy, ale również precision, recall, f-measure i ROC AUC, które lepiej oddają skuteczność klasyfikacji w kontekście niezbalansowanych danych.
+
+-   Spośród wszystkich analizowanych modeli, najwyższą skutecznością klasyfikacyjną wykazał się algorytm XGBoost. Zarówno w wersji bazowej, jak i po dostrojeniu hiperparametrów osiągał on najwyższe wartości metryk, w szczególności ROC AUC, co potwierdza jego zdolność do skutecznego rozróżniania klientów zainteresowanych lokatą. Random Forest również osiągnął wysokie wyniki, jednak ustępował XGBoost pod względem jakości predykcji.
+
+-   Modele regresji logistycznej, SVM, MLP oraz drzewa decyzyjnego uzyskały zbliżoną skuteczność, jednak ich parametry klasyfikacyjne były nieco niższe. Jednocześnie, dla większości modeli uzyskano zrównoważone wyniki na zbiorze treningowym i testowym, co wskazuje na ich stabilność i brak istotnego przeuczenia.
+
+-   Wyniki projektu potwierdzają, że metody oparte na algorytmach ensemble oraz boosting, takie jak XGBoost, sprawdzają się szczególnie dobrze w zadaniach klasyfikacyjnych o dużym zróżnicowaniu zmiennych i umiarkowanym problemie niezbalansowania klas. Wykorzystanie tego typu modeli może stanowić cenne narzędzie wspomagające procesy decyzyjne w kampaniach marketingowych banków.
